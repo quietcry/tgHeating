@@ -1,7 +1,7 @@
 blueprint:
   name: tgHeating
   domain: automation
-  description: Heating Configuration based on state of persons
+  description: Heating Configuration based on state of persons or users
   input:
     debugmode:
       name: "debug mode"
