@@ -1,5 +1,5 @@
 blueprint:
-  name: HeatingTest
+  name: tgHeating
   domain: automation
   description: Heating Configuration based on state of persons
   input:
