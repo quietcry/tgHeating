@@ -1,0 +1,782 @@
+blueprint:
+  name: HeatingTest
+  domain: automation
+  description: Heating Configuration based on state of persons
+  input:
+    debugmode:
+      name: "debug mode"
+      default: false
+      selector:
+        boolean:
+
+    conf_persons:
+      name: relevant people
+      icon: mdi:cog
+      collapsed: true
+      description: Configuration
+      input:  
+        linked_persons:
+          name: persons or text-helpers with state of persons
+          default: "-"
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain:
+                  - person
+                  - input_text
+    conf_devices:
+      name: heating devices
+      icon: mdi:cog
+      collapsed: true
+      description: Configuration
+      input:  
+        linked_heatings:
+          name: conf_devices
+          default: "-"
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain: climate
+
+    conf_basic:
+      name: Base Configuration
+      icon: mdi:cog
+      collapsed: true
+      description: Configuration
+      input:  
+        default_cmd:
+          name:  "default:"
+          default: '{"WZ":"off","KU":"off","AZ":"off","GZ1":"off","GZ2":"off","GT":"off","FL":"off","BD":"off","SZ":"off"}'
+          selector:
+            text:
+              multiline: true
+
+        sequence:
+          name: "sequence"
+          default: 'on,off,boost,$temperature,P3,P2,P1'
+
+
+    conf_weekplan:
+      name: Weekplan Configuration
+      icon: mdi:cog
+      collapsed: true
+      description: Configuration
+      input:  
+        weekplan_cmd:
+          name:  "default:"
+          default: '{"plan1":{"1":["14:54-P3","00:09-P3","24:00-P1"],"2":"15:30-p5","3":"3:plan2","4":"1:plan2"}}'
+          selector:
+            text:
+              multiline: true
+
+        weekplan_helper:
+          name: "Weekplan-Helfer"
+          default: '-'
+          selector:
+            entity:
+              multiple: false
+              filter:
+                domain:
+                  - input_datetime
+
+
+    jsonCmd:
+      name: '**JSON Command line**<br>{"username":}'
+      default: '{
+                "tommy":  {
+                          "playtime":{"WZ":"P3", "KU":24, "AZ":"P2"},
+                          "home":{"AZ":"P1"}
+                          }
+                }'
+      selector:
+        text:
+          multiline: true
+
+    switch_1:
+      name: Schalter 1
+      icon: mdi:cog
+      collapsed: true
+      description: Konfiguration Schalter 1
+      input:  
+        switch_1_device:
+          name: verknüpfte Entität
+          default: "-"
+          selector:
+            entity:
+              multiple: false          
+              filter:
+                domain: 
+                  - input_boolean
+                  - input_schedule
+        switch_1_on_cmd:
+          name:  "on-cmd:"
+          default: '{}'
+          selector:
+            text:
+              multiline: true
+
+        switch_1_on_mode:
+          name: "exclusive-Modus"
+          default: 
+          selector:
+            boolean:
+
+        switch_1_off_cmd:
+          name:  "off-cmd:"
+          default: '{}'
+          selector:
+            text:
+              multiline: true
+        switch_1_off_mode:
+          name: "off-Modus"
+          default: 
+          selector:
+            boolean:
+
+    switch_2:
+      name: Schalter 2
+      icon: mdi:cog
+      collapsed: true
+      description: Konfiguration Schalter 2
+      input:  
+        switch_2_device:
+          name: verknüpfte Entität
+          default: "-"
+          selector:
+            entity:
+              multiple: false          
+              filter:
+                domain: 
+                  - input_boolean
+                  - input_schedule
+        switch_2_on_cmd:
+          name:  "on-cmd:"
+          default: '{}'
+          selector:
+            text:
+              multiline: true
+
+        switch_2_on_mode:
+          name: "exclusive-Modus"
+          default: 
+          selector:
+            boolean:
+
+        switch_2_off_cmd:
+          name:  "off-cmd:"
+          default: '{}'
+          selector:
+            text:
+              multiline: true
+        switch_2_off_mode:
+          name: "off-Modus"
+          default: 
+          selector:
+            boolean:
+
+    switch_3:
+      name: Schalter 3
+      icon: mdi:cog
+      collapsed: true
+      description: Konfiguration Schalter 3
+      input:  
+        switch_3_device:
+          name: verknüpfte Entität
+          default: "-"
+          selector:
+            entity:
+              multiple: false          
+              filter:
+                domain: 
+                  - input_boolean
+                  - input_schedule
+        switch_3_on_cmd:
+          name:  "on-cmd:"
+          default: '{}'
+          selector:
+            text:
+              multiline: true
+
+        switch_3_on_mode:
+          name: "exclusive-Modus"
+          default: 
+          selector:
+            boolean:
+
+        switch_3_off_cmd:
+          name:  "off-cmd:"
+          default: '{}'
+          selector:
+            text:
+              multiline: true
+        switch_3_off_mode:
+          name: "off-Modus"
+          default: 
+          selector:
+            boolean:
+
+    switch_4:
+      name: Schalter 4
+      icon: mdi:cog
+      collapsed: true
+      description: Konfiguration Schalter 4
+      input:  
+        switch_4_device:
+          name: verknüpfte Entität
+          default: "-"
+          selector:
+            entity:
+              multiple: false          
+              filter:
+                domain: 
+                  - input_boolean
+                  - input_schedule
+        switch_4_on_cmd:
+          name:  "on-cmd:"
+          default: '{}'
+          selector:
+            text:
+              multiline: true
+
+        switch_4_on_mode:
+          name: "exclusive-Modus"
+          default: 
+          selector:
+            boolean:
+
+        switch_4_off_cmd:
+          name:  "off-cmd:"
+          default: '{}'
+          selector:
+            text:
+              multiline: true
+        switch_4_off_mode:
+          name: "off-Modus"
+          default: 
+          selector:
+            boolean:
+
+    switch_5:
+      name: Schalter 5
+      icon: mdi:cog
+      collapsed: true
+      description: Konfiguration Schalter 5
+      input:  
+        switch_5_device:
+          name: verknüpfte Entität
+          default: "-"
+          selector:
+            entity:
+              multiple: false          
+              filter:
+                domain: 
+                  - input_boolean
+                  - input_schedule
+        switch_5_on_cmd:
+          name:  "on-cmd:"
+          default: '{}'
+          selector:
+            text:
+              multiline: true
+
+        switch_5_on_mode:
+          name: "exclusive-Modus"
+          default: 
+          selector:
+            boolean:
+
+        switch_5_off_cmd:
+          name:  "off-cmd:"
+          default: '{}'
+          selector:
+            text:
+              multiline: true
+        switch_5_off_mode:
+          name: "off-Modus"
+          default: 
+          selector:
+            boolean:
+
+variables:
+  linked_persons: !input linked_persons
+  linked_heatings: !input linked_heatings
+  weekplan_helper: !input weekplan_helper
+
+  jsonCmd: !input jsonCmd
+  sequence: !input sequence
+  default_cmd: !input default_cmd
+  debugmode: !input debugmode
+  coolingmode: true
+  switches:   [
+              {
+              'device': !input switch_1_device,
+              'on_cmd': !input switch_1_on_cmd,
+              'on_mode': !input switch_1_on_mode,
+              'off_cmd': !input switch_1_off_cmd,
+              'off_mode': !input switch_1_off_mode,
+              },
+              {
+              'device': !input switch_2_device,
+              'on_cmd': !input switch_2_on_cmd,
+              'on_mode': !input switch_2_on_mode,
+              'off_cmd': !input switch_2_off_cmd,
+              'off_mode': !input switch_2_off_mode,
+              },
+              {
+              'device': !input switch_3_device,
+              'on_cmd': !input switch_3_on_cmd,
+              'on_mode': !input switch_3_on_mode,
+              'off_cmd': !input switch_3_off_cmd,
+              'off_mode': !input switch_3_off_mode,
+              },
+              {
+              'device': !input switch_4_device,
+              'on_cmd': !input switch_4_on_cmd,
+              'on_mode': !input switch_4_on_mode,
+              'off_cmd': !input switch_4_off_cmd,
+              'off_mode': !input switch_4_off_mode,
+              },
+              {
+              'device': !input switch_5_device,
+              'on_cmd': !input switch_5_on_cmd,
+              'on_mode': !input switch_5_on_mode,
+              'off_cmd': !input switch_5_off_cmd,
+              'off_mode': !input switch_5_off_mode,
+              },
+              ]
+  observed: >-
+    {%- macro observer(itemlist) -%}
+    {%- for item in itemlist -%}
+      {%- if item.device and item.device != "-" and states(item.device) != 'unknown' -%}
+        {%- set ns.myEntities = ns.myEntities + [item.device]%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- endmacro -%}
+    {%- set ns = namespace()%}
+    {%- set ns.myEntities = linked_persons -%}
+    {%- set status = observer(switches)  -%}
+    {{- ns.myEntities -}}
+
+
+
+
+trigger:
+  - platform: event
+    event_type: state_changed
+  - platform: homeassistant
+    event: start
+    id: haStart
+  - platform: template
+    value_template: >-
+      {%- if states(weekplan_helper) != 'unknown' -%}
+        {%- set stamp = state_attr(weekplan_helper, "timestamp")|int -%}
+        {%- set _now = now().timestamp()|int -%} 
+        {% if stamp <= _now and (stamp + 1) >= _now  -%}true{%- endif -%}
+      {%- endif -%}
+    id: weekplan
+
+condition:
+  - condition: or
+    conditions:
+      - condition: trigger
+        id:
+          - haStart
+          - weekplan
+      - condition: template
+        value_template: " {%- if trigger.event.data.entity_id in observed -%}true{%- endif -%}"
+
+action:
+  - variables:
+      debugmessage_pre:  "<u>debugmode pre</u><BR/>"
+      debugmessage_post: "<u>debugmode post</u><BR/>"
+
+  - if:
+      - condition: template
+        value_template: "{{debugmode}}"
+    then:
+      - action: notify.persistent_notification
+        metadata: {}
+        data:
+          message: "{{debugmessage_pre}}<BR/><i><b> observed Devices:</b></i><BR/>{{observed}}}<BR/><i><b> default Cmd:</b></i><BR/>{{default_cmd}}"
+  - variables:
+      my_settings: >-
+        {# ___________________________________________________ #}
+        {%- macro getFormated(val) -%}
+          {%- if val is number -%}
+            {{- val -}}
+          {%- else -%}
+            {{- "\"" ~ val ~ "\"" -}}
+          {%- endif -%}              
+        {%- endmacro -%}
+        {# ___________________________________________________ #}
+
+        {# ___________________________________________________ #}
+        {%- macro getName(personid) -%}
+          {%- set tmp = personid.split(".") -%}
+          {%- set pos = tmp|length -%}
+          {%- set tmp = tmp[pos-1].split("_") -%}
+          {%- set pos = tmp|length -%}
+          {%- if tmp|length > 1 and  tmp[pos-1]|int(-1) != -1 -%}
+            {{- tmp[pos-2] ~ "_" ~ tmp[pos-1] -}}
+          {%- else -%}
+            {{- tmp[pos-1] -}}
+          {%- endif -%}              
+        {%- endmacro -%}
+        {# ___________________________________________________ #}
+
+        {# ___________________________________________________ #}
+        {%- macro sortVal(val1, val2) -%}
+          {%- for seq in ns.sequence -%}
+            {%- if seq == val1 or seq == val2 -%}
+              {{-seq-}}
+              {%- break -%}      
+            {%- elif seq == "$temperature" -%}
+              {%- if val1 is number and val2 is number -%}
+                {%- if val1 > val2 -%}  {{-val1-}} {%- else -%}  {{-val2-}} {%- endif -%}           
+                {%- break -%}      
+              {%- elif val1 is number -%}
+                {{-val1-}}           
+                {%- break -%}      
+              {%- elif val2 is number -%}
+                {{-val2-}}           
+                {%- break -%}      
+              {%- endif -%}           
+            {%- endif -%}           
+          {%- endfor -%}      
+        {%- endmacro -%}
+        {# ___________________________________________________ #}
+
+        {# ___________________________________________________ #}
+        {%- macro getSettings(sName, sState, sCmd) -%}
+          {%- set myCmd = sCmd|from_json -%}
+          {%- if myCmd[sName] is defined and myCmd[sName][sState] is defined -%} 
+            {%- set ns.debug = ns.debug ~ "<p>User <b>" ~ sName ~ "</b> [" ~ sState ~ "] found.<BR/><i>" ~ myCmd[sName][sState]|to_json ~ "</i></p>"-%}
+            {{- myCmd[sName][sState]|to_json -}}
+
+          {%- else -%}
+            {%- set ns.debug = ns.debug ~ "<p>User <b>" ~ sName ~ "</b> [" ~ sState ~ "] not found.<BR/></p>"-%}
+
+            {{- "{}" -}}
+          {%- endif -%}      
+        {%- endmacro -%}
+        {# ___________________________________________________ #}
+
+        {# ___________________________________________________ #}
+        {%- macro mergeCmd(m1Cmd, m2Cmd) -%}
+          {%- set tmpns = namespace() -%}
+          {%- set myCmd1 = m1Cmd|from_json -%}
+          {%- set myCmd2 = m2Cmd|from_json -%}
+          {%- set tmpns.myCmd = "" -%}
+          {%- set tmpns.komma = "" -%}
+          {%- for room in myCmd1 -%}
+            {%- if tmpns.myCmd|length > 0 -%}{%- set tmpns.komma = ", " -%}{%- else -%}{%- set tmpns.komma = "" -%}{%- endif -%}  
+            {%- if myCmd2[room] is not defined -%}
+              {%- set tmpns.myCmd = tmpns.myCmd ~ tmpns.komma ~ "\"" ~room ~ "\"" ~ ":" ~ getFormated(myCmd1[room]) -%}                      
+            {%- endif -%}      
+          {%- endfor -%}      
+          {%- for room in myCmd2 -%}
+            {%- if tmpns.myCmd|length > 0 -%}{%- set tmpns.komma = ", " -%}{%- else -%}{%- set tmpns.komma = "" -%}{%- endif -%}  
+            {%- if myCmd1[room] is not defined -%} 
+              {%- set tmpns.myCmd = tmpns.myCmd ~ tmpns.komma ~ "\"" ~room ~ "\"" ~ ":" ~ getFormated(myCmd2[room]) -%} 
+            {%- else -%}
+              {%- set val=sortVal(myCmd1[room], myCmd2[room]) -%}
+              {%- if val -%} 
+                {%- set tmpns.myCmd = tmpns.myCmd ~ tmpns.komma ~ "\"" ~room ~ "\"" ~ ":" ~ getFormated(val) -%} 
+              {%- endif -%}      
+            {%- endif -%}      
+          {%- endfor -%}      
+          {#
+          ${{ m1Cmd }}={{ m2Cmd }} >> {{- "{" ~ tmpns.myCmd ~ "}" -}}§
+          #}
+          {{- "{" ~ tmpns.myCmd ~ "}" -}}
+        {%- endmacro -%}
+        {# ___________________________________________________ #}
+
+        {# ___________________________________________________ #}
+        {%- macro createAction_hmip(c_dev, c_cmd, c_item) -%}
+          {%- set _ns = namespace() -%}
+          {%- set _ns.subdev = none -%}
+          {%- set submode = none -%}
+          {%- set deviceID = device_id(c_dev) -%}
+
+          {%- set class = state_attr(c_dev, 'model').split("-") -%}
+          {% if class is list and class|length > 0 %}{%- set class = class[0] -%} {% else %}{%- set class = none -%}{% endif %}
+
+          {%- if class == "HM" -%}
+            {%- set subdevs = states.select | selectattr('entity_id', 'search', 'presetmodes$') | map(attribute='entity_id')|list -%}
+            {%- set name = state_attr(c_dev, 'friendly_name').split(" ") -%}
+            {% if name is list and name|length > 0 %}
+              {%- set name = name[0] ~ "_presetModes"-%}
+              {%- for subdev in subdevs -%}
+                {%- if state_attr(subdev, 'friendly_name') == name -%}
+                  {%- set _ns.subdev = subdev -%}
+                  {%- break -%}
+                {%- endif -%}
+              {%- endfor -%}
+            {% endif %}
+          {% endif %}
+
+          {%- set action = "" -%}
+          {%- set mode = "-" -%}
+          {%- if c_cmd is search("^P\d$") -%}
+            {%- set action = "week_program_" ~ c_cmd[1:2] -%}
+            {%- set mode = "program" -%}
+          {%- elif c_cmd is search("^boost") -%}
+            {%- set mode = "boost" -%}
+            {%- set action = c_cmd[6:c_cmd|length] -%}
+            {%- if action is search("^P\d$") -%}
+              {%- set action = "week_program_" ~ action[1:2] -%}
+              {%- set submode = "program" -%}
+            {%- elif action|int(-1) != -1  -%}
+              {%- set action = action|int -%}
+              {%- set submode = "temp" -%}
+            {%- else -%}
+              {%- set action = none -%}
+              {%- set submode = none -%}
+              {%- set mode = none -%}
+            {% endif %}
+          {%- elif c_cmd|int(-1) != -1  -%}
+            {%- set action = c_cmd|int -%}
+            {%- set mode = "temp" -%}
+          {%- elif c_cmd == "off"  -%}
+            {%- set action = none -%}
+            {%- set mode = "off" -%}
+          {% endif %}        
+
+          {%- set c_action = [{"device": c_dev, "set": mode, "item": c_item, "cmd": c_cmd, "class": class, "subdevice": _ns.subdev, "deviceID": deviceID, "submode": submode, "action" : action}] -%}
+          {{- c_action|to_json -}}
+        {%- endmacro -%}
+        {# ___________________________________________________ #}
+
+        {%- set ns = namespace() -%}
+        {%- set ns.cmd = default_cmd -%}
+        {%- set ns.sequence = sequence.split(",") -%}
+        {%- set ns.debug = "" -%}
+        {%- set ns.devices = [] -%}
+        {%- set ns.manipulated_devices = [] -%}
+       
+        {%- set ns.userbreak = false -%}
+        {%- for switch in switches -%}
+          {%- if switch.device and switch.device != "-" -%}
+            {%- if states(switch.device) == "on" -%}
+              {%- set ns.debug = ns.debug ~ "<p> switch : <b>" ~ switch.device ~ "</b> is on<BR/>" ~ switch.on_cmd ~ "<br/>breakmode=" ~ switch.on_mode ~"</p>" -%}
+              {%- set ns.cmd = mergeCmd(ns.cmd, switch.on_cmd) -%}
+              {%- if switch.on_mode -%}
+                {%- set ns.userbreak = true -%}
+                {%- break -%}
+              {%- endif -%}
+            {%- elif states(switch.device) == "off" -%}
+              {%- set ns.debug = ns.debug ~ "<p> switch : <b>" ~ switch.device ~ "</b> is off<BR/>" ~ switch.off_cmd ~ "<br/>breakmode=" ~ switch.off_mode ~"</p>" -%}
+              {%- set ns.cmd = mergeCmd(ns.cmd, switch.off_cmd) -%}
+              {%- if switch.off_mode -%}
+                {%- set ns.userbreak = true -%}
+                {%- break -%}
+              {%- endif -%}
+            {%- else -%}
+              {%- break -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endfor -%}
+
+        {%- if not ns.userbreak -%}
+          {%- set ns.usercmd = "{}" -%}
+          {%- set ns.debug = ns.debug ~ "<p>persons:<br>" -%}
+          {%- for person in linked_persons -%}
+            {%- set name = getName(person) -%}
+            {%- set state = states(person) -%}
+            {%- set ns.debug = ns.debug ~ "<i>" ~ name ~ " : " ~ state ~ "<i/><br>" -%}
+            {%- set ns.usercmd = getSettings(name, state, jsonCmd) -%}
+            {%- set ns.cmd = mergeCmd(ns.cmd, ns.usercmd) -%}
+          {%- endfor -%}
+          {%- set ns.debug = ns.debug ~ "</p>" -%}
+
+        {%- endif -%}
+        {%- set ns.cmd = ns.cmd|from_json -%}
+
+        {%- set tmp = namespace() -%}
+        {%- set tmp.usedIntegrations = ["homematicip_local"] -%}
+        {%- set tmp.integrations = [] -%}
+
+        {%- for key in tmp.usedIntegrations -%}
+          {%-if not key in tmp.integrations|map(attribute='key')|list -%}
+            {%-set tmp.integrations = tmp.integrations + [{"key": key, "dev": integration_entities(key)}] -%}    
+          {%-endif -%}
+        {%- endfor -%}
+
+        {%- for device in linked_heatings -%}
+          {%- for itm, val in ns.cmd.items() -%}
+            {%- if state_attr(device, 'friendly_name') is match(itm) -%}
+              {%- for integration in tmp.integrations -%}
+                {%-if integration.dev and integration.key and device in integration.dev -%}
+                  {%-if integration.key == "homematicip_local" -%}
+                    {%-if not device in ns.manipulated_devices|map(attribute='device')|list -%}
+                      {%- set action = createAction_hmip(device, val, itm) -%}
+                      {%-if action -%}
+                        {%-set ns.manipulated_devices = ns.manipulated_devices + action|from_json -%}    
+                      {%-endif -%}
+                    {%-endif -%}
+                  {%-endif -%}
+                {%-endif -%}
+              {%- endfor -%}
+            {%- endif -%}
+          {%- endfor -%}        
+        {%- endfor -%}
+
+        {{ {"data": ns.cmd, "debug": ns.debug, "devices": ns.manipulated_devices } }}
+
+# Debug - Message  post    
+  - if:
+      - condition: template
+        value_template: "{{debugmode}}"
+    then:
+      - action: notify.persistent_notification
+        metadata: {}
+        data:
+          message: '{{debugmessage_post ~ "default :<BR/>" ~ default_cmd ~ "<hr>" ~ my_settings.debug ~ "<BR/>Result :<BR/>" ~ my_settings.data ~ "<BR/>devices :<BR/>" ~ my_settings.devices }}'    
+  - variables:
+      my_devices: '{{  my_settings.devices | selectattr("class", "==", "HmIP")| selectattr("set", "==", "program") | list }}'
+
+# Debug - Message  Devices    
+  - if:
+      - condition: template
+        value_template: "{{debugmode and my_devices|length > 0}}"
+    then:
+      - action: notify.persistent_notification
+        metadata: {}
+        data:
+          message: '{{"<u>Devices</u><br>filtered by<BR>class=HmIP, set=program <BR>" ~ my_devices}}'    
+
+  - repeat:
+      count: "{{my_devices|length|int}}"
+      sequence:
+        - variables:
+            current_device: '{{  my_devices[repeat.index - 1].device }}'
+
+# Debug - Message  Devices    
+        - if:
+            - condition: template
+              value_template: "{{debugmode and my_devices|length > 0}}"
+          then:
+            - action: notify.persistent_notification
+              metadata: {}
+              data:
+                message: '{{- current_device -}} : {{- my_devices[repeat.index - 1].action -}}'
+
+        - action: climate.set_hvac_mode
+          metadata: {}
+          data:
+            hvac_mode: auto
+          target:
+            device_id: "{{- my_devices[repeat.index - 1].deviceID -}}"
+        - repeat:
+            while:
+              - condition: template
+                value_template: '{{"week_program_1" not in state_attr(current_device, "preset_modes")}}'
+              # Don't do it too many times
+              - condition: template
+                value_template: "{{ repeat.index <= 20 }}"
+            sequence:
+              - delay:
+                  hours: 0
+                  minutes: 0
+                  seconds: 1
+                  milliseconds: 0
+       
+        - action: climate.set_preset_mode
+          alias: set Wochenprogramm
+          data:
+            preset_mode: "{{- my_devices[repeat.index - 1].action -}}"
+          target:
+            device_id: "{{- my_devices[repeat.index - 1].deviceID -}}"
+           
+            
+                
+  - variables:
+      my_devices: '{{  my_settings.devices | selectattr("class", "==", "HM") | selectattr("subdevice", "defined") | selectattr("set", "==", "program") | list }}'
+
+# Debug - Message  Devices    
+  - if:
+      - condition: template
+        value_template: "{{debugmode and my_devices|length > 0}}"
+    then:
+      - action: notify.persistent_notification
+        metadata: {}
+        data:
+          message: '{{"<u>Devices</u><br>filtered by<BR>class=HM, set=program, subdevice=defined  <BR>" ~ my_devices}}'    
+
+  - repeat:
+      count: "{{my_devices|length|int}}"
+      sequence:
+        - action: climate.set_hvac_mode
+          metadata: {}
+          data:
+            hvac_mode: auto
+          target:
+            device_id: "{{- my_devices[repeat.index - 1].deviceID -}}"
+        - action: select.select_option
+          alias: Wochenprogramm
+          target:
+            device_id: "{{- my_devices[repeat.index - 1].subdevice -}}"
+          data:
+            option: "{{- my_devices[repeat.index - 1].action -}}"
+
+  - variables:
+      my_devices: '{{  my_settings.devices | selectattr("class", "match", "^H[Mm].*") | selectattr("set", "==", "off") | list }}'
+
+
+# Debug - Message  Devices    
+  - if:
+      - condition: template
+        value_template: "{{debugmode and my_devices|length > 0}}"
+    then:
+      - action: notify.persistent_notification
+        metadata: {}
+        data:
+          message: '{{"<u>Devices</u><br>filtered by<BR>class=H[Mm], set=off  <BR>" ~ my_devices}}'    
+
+  - repeat:
+      count: "{{my_devices|length|int}}"
+      sequence:
+        - action: climate.set_hvac_mode
+          metadata: {}
+          data:
+            hvac_mode: off
+          target:
+            device_id: "{{- my_devices[repeat.index - 1].deviceID -}}"
+
+
+  - variables:
+      my_devices: '{{  my_settings.devices | selectattr("class", "match", "^H[Mm].*") | selectattr("set", "==", "temp") | list }}'
+
+# Debug - Message  Devices    
+  - if:
+      - condition: template
+        value_template: "{{debugmode and my_devices|length > 0}}"
+    then:
+      - action: notify.persistent_notification
+        metadata: {}
+        data:
+          message: '{{"<u>Devices</u><br>filtered by<BR>class=H[Mm], set=temp  <BR>" ~ my_devices}}'    
+
+  - repeat:
+      count: "{{my_devices|length|int}}"
+      sequence:
+        - action: climate.set_hvac_mode
+          metadata: {}
+          data:
+            hvac_mode: auto
+          target:
+            device_id: "{{- my_devices[repeat.index - 1].deviceID -}}"
+        - action: climate.set_temperature
+          metadata: {}
+          data:
+            temperature: "{{- my_devices[repeat.index - 1].action -}}"
+          target:
+            device_id: "{{- my_devices[repeat.index - 1].deviceID -}}"
+
+
+mode: single
+
+
