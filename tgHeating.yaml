@@ -55,7 +55,7 @@ blueprint:
 
         sequence:
           name: "sequence"
-          default: 'on,off,boost,$temperature,P3,P2,P1'
+          default: 'on,off,boost,$temperature,WP,P'
 
 
     conf_weekplan:
@@ -66,7 +66,7 @@ blueprint:
       input:  
         weekplan_cmd:
           name:  "default:"
-          default: '{"plan1":{"1":["14:54-P3","00:09-P3","24:00-P1"],"2":"15:30-p5","3":"3:plan2","4":"1:plan2"}}'
+          default: '{"plan1":{"1":["14:54-P!3","00:09-P!3","24:00-P!1"],"2":"15:30-p5","3":"3:plan2","4":"1:plan2"}}'
           selector:
             text:
               multiline: true
@@ -83,11 +83,11 @@ blueprint:
 
 
     jsonCmd:
-      name: '**JSON Command line**<br>{"username":}'
+      name: 'JSON Command line'
       default: '{
                 "tommy":  {
-                          "playtime":{"WZ":"P3", "KU":24, "AZ":"P2"},
-                          "home":{"AZ":"P1"}
+                          "playtime":{"WZ":"P!3", "KU":24, "AZ":"P!2"},
+                          "home":{"AZ":"P!1"}
                           }
                 }'
       selector:
@@ -360,22 +360,28 @@ variables:
     {{- ns.myEntities -}}
 
 
-
-
 trigger:
   - platform: event
     event_type: state_changed
   - platform: homeassistant
     event: start
     id: haStart
-  - platform: template
-    value_template: >-
-      {%- if states(weekplan_helper) != 'unknown' -%}
-        {%- set stamp = state_attr(weekplan_helper, "timestamp")|int -%}
-        {%- set _now = now().timestamp()|int -%} 
-        {% if stamp <= _now and (stamp + 1) >= _now  -%}true{%- endif -%}
-      {%- endif -%}
-    id: weekplan
+  - platform: state
+    entity_id: input_boolean.reloadconfig
+    from: "on"
+    to: "off"
+    id: "reloadConfig"
+
+  # - platform: template
+  #   value_template: >-
+      # {#
+      # {%- if states(weekplan_helper) != 'unknown' -%}
+      #   {%- set stamp = state_attr(weekplan_helper, "timestamp")|int -%}
+      #   {%- set _now = now().timestamp()|int -%} 
+      #   {% if stamp <= _now and (stamp + 1) >= _now  -%}true{%- endif -%}
+      # {%- endif -%}
+      #}
+    # id: weekplan
 
 condition:
   - condition: or
@@ -384,6 +390,7 @@ condition:
         id:
           - haStart
           - weekplan
+          - reloadConfig
       - condition: template
         value_template: " {%- if trigger.event.data.entity_id in observed -%}true{%- endif -%}"
 
@@ -428,23 +435,51 @@ action:
 
         {# ___________________________________________________ #}
         {%- macro sortVal(val1, val2) -%}
-          {%- for seq in ns.sequence -%}
-            {%- if seq == val1 or seq == val2 -%}
-              {{-seq-}}
-              {%- break -%}      
+          {%- set _sortValNS = namespace() -%}
+          {%- set srch1 = (val1|string).split("!") -%}
+          {%- set srch2 = (val2|string).split("!") -%}
+
+          {%- set _sortValNS.retVal = none -%}
+          {%- for seq in ns.sequence|reverse -%}
+            {#
+            {%- set ns.debug = ns.debug ~ "<p> sorting : <b>" ~ seq ~ " > " ~srch1[0] ~ " : "~ srch2[0] ~ "</b> = " ~ _sortValNS.retVal ~ "|" ~ val1 ~"</p><BR/>" -%}
+            #}
+            {%- if seq == srch1[0] and seq != srch2[0] -%}
+              {%- set _sortValNS.retVal = val1 -%}
+              {%- break -%}
+
+            {%- elif seq == srch2[0] and seq != srch1[0] -%}
+              {%- set _sortValNS.retVal = val2 -%}
+              {%- break -%}
+
+            {%- elif seq == srch1[0] and seq == srch2[0] -%}
+              {%- for item in [val1, val2 ]|sort(case_sensitive=false) -%}
+                {%- set _sortValNS.retVal = item -%}
+                {%- break -%}
+              {%- endfor -%}                   
+              {%- break -%}
+              
             {%- elif seq == "$temperature" -%}
-              {%- if val1 is number and val2 is number -%}
-                {%- if val1 > val2 -%}  {{-val1-}} {%- else -%}  {{-val2-}} {%- endif -%}           
+              {%- if val1 is search("^\d*[.,]{0,1}\d*$") and val2 is is search("^\d*[.,]{0,1}\d*$") -%}
+                {%- if val1|replace(",", ".")|float > val2|replace(",", ".")|float -%}  {%- set _sortValNS.retVal = val1 -%} {%- else -%}  {%- set _sortValNS.retVal = val2 -%} {%- endif -%}           
                 {%- break -%}      
-              {%- elif val1 is number -%}
-                {{-val1-}}           
+              {%- elif val1 is search("^\d*[.,]{0,1}\d*$") -%}
+                {%- set _sortValNS.retVal = val1|replace(",", ".") -%}          
                 {%- break -%}      
-              {%- elif val2 is number -%}
-                {{-val2-}}           
+              {%- elif val2 is search("^\d*[.,]{0,1}\d*$") -%}
+                {%- set _sortValNS.retVal = val2|replace(",", ".") -%}         
                 {%- break -%}      
-              {%- endif -%}           
+              {%- endif -%} 
+
             {%- endif -%}           
-          {%- endfor -%}      
+          {%- endfor -%}
+          {#
+          {%- set ns.debug = ns.debug ~ "<p> sort : <b>" ~ srch1[0] ~ " : " ~ srch2[0] ~ "</b> = " ~ _sortValNS.retVal ~ "|" ~ val1 ~"</p><BR/>" -%}
+          #}
+
+          {%- if not _sortValNS.retVal -%}{{-val1-}} {%-else -%}{{-_sortValNS.retVal-}} {%- endif -%}
+
+
         {%- endmacro -%}
         {# ___________________________________________________ #}
 
@@ -459,38 +494,40 @@ action:
             {%- set ns.debug = ns.debug ~ "<p>User <b>" ~ sName ~ "</b> [" ~ sState ~ "] not found.<BR/></p>"-%}
 
             {{- "{}" -}}
-          {%- endif -%}      
+          {%- endif -%}
         {%- endmacro -%}
         {# ___________________________________________________ #}
 
         {# ___________________________________________________ #}
         {%- macro mergeCmd(m1Cmd, m2Cmd) -%}
-          {%- set tmpns = namespace() -%}
+          {%- set _mergeCmdNS = namespace() -%}
           {%- set myCmd1 = m1Cmd|from_json -%}
           {%- set myCmd2 = m2Cmd|from_json -%}
-          {%- set tmpns.myCmd = "" -%}
-          {%- set tmpns.komma = "" -%}
+          {%- set _mergeCmdNS.myCmd = "" -%}
+          {%- set _mergeCmdNS.komma = "" -%}
+
           {%- for room in myCmd1 -%}
-            {%- if tmpns.myCmd|length > 0 -%}{%- set tmpns.komma = ", " -%}{%- else -%}{%- set tmpns.komma = "" -%}{%- endif -%}  
+            {%- if _mergeCmdNS.myCmd|length > 0 -%}{%- set _mergeCmdNS.komma = ", " -%}{%- else -%}{%- set _mergeCmdNS.komma = "" -%}{%- endif -%}  
             {%- if myCmd2[room] is not defined -%}
-              {%- set tmpns.myCmd = tmpns.myCmd ~ tmpns.komma ~ "\"" ~room ~ "\"" ~ ":" ~ getFormated(myCmd1[room]) -%}                      
+              {%- set _mergeCmdNS.myCmd = _mergeCmdNS.myCmd ~ _mergeCmdNS.komma ~ "\"" ~room ~ "\"" ~ ":" ~ getFormated(myCmd1[room]) -%}                      
             {%- endif -%}      
-          {%- endfor -%}      
+          {%- endfor -%}  
+
           {%- for room in myCmd2 -%}
-            {%- if tmpns.myCmd|length > 0 -%}{%- set tmpns.komma = ", " -%}{%- else -%}{%- set tmpns.komma = "" -%}{%- endif -%}  
+            {%- if _mergeCmdNS.myCmd|length > 0 -%}{%- set _mergeCmdNS.komma = ", " -%}{%- else -%}{%- set _mergeCmdNS.komma = "" -%}{%- endif -%}  
             {%- if myCmd1[room] is not defined -%} 
-              {%- set tmpns.myCmd = tmpns.myCmd ~ tmpns.komma ~ "\"" ~room ~ "\"" ~ ":" ~ getFormated(myCmd2[room]) -%} 
+              {%- set _mergeCmdNS.myCmd = _mergeCmdNS.myCmd ~ _mergeCmdNS.komma ~ "\"" ~room ~ "\"" ~ ":" ~ getFormated(myCmd2[room]) -%} 
             {%- else -%}
               {%- set val=sortVal(myCmd1[room], myCmd2[room]) -%}
+
               {%- if val -%} 
-                {%- set tmpns.myCmd = tmpns.myCmd ~ tmpns.komma ~ "\"" ~room ~ "\"" ~ ":" ~ getFormated(val) -%} 
+                {%- set _mergeCmdNS.myCmd = _mergeCmdNS.myCmd ~ _mergeCmdNS.komma ~ "\"" ~room ~ "\"" ~ ":" ~ getFormated(val) -%} 
               {%- endif -%}      
             {%- endif -%}      
-          {%- endfor -%}      
-          {#
-          ${{ m1Cmd }}={{ m2Cmd }} >> {{- "{" ~ tmpns.myCmd ~ "}" -}}§
-          #}
-          {{- "{" ~ tmpns.myCmd ~ "}" -}}
+          {%- endfor -%}
+
+          {{- "{" ~ _mergeCmdNS.myCmd ~ "}" -}}
+     
         {%- endmacro -%}
         {# ___________________________________________________ #}
 
@@ -550,13 +587,127 @@ action:
         {%- endmacro -%}
         {# ___________________________________________________ #}
 
+        {# ___________________________________________________ #}
+        {%- macro getPartOfAttr(c_dev, c_attr, c_splitter, c_pos, c_default=none) -%}
+
+          {%- set myattr = state_attr(c_dev, c_attr) -%}
+          {%- if myattr and myattr is search(c_splitter) -%}
+            {%- set myattr = myattr.split(c_splitter) -%}
+            {% if myattr is list and myattr|length > (c_pos+1) %}{%- set myattr = myattr[c_pos] -%} {% else %}{%- set myattr = none -%}{% endif %}
+          {% else %}
+            {%- set myattr = c_default -%}       
+          {% endif %}        
+          {{- myattr -}}
+        {%- endmacro -%}
+        {# ___________________________________________________ #}
+
+        {# ___________________________________________________ #}
+        {%- macro getAction(cmd) -%}
+          {%- set _getAction = namespace() -%}
+       
+          {%- if cmd is search("^P!\d$") -%}
+            {%- set _getAction.action =  cmd[2:3] -%}
+            {%- set _getAction.mode = "program" -%}
+
+          {%- elif  cmd is search("^WP![A-Za-z\d_]+?$") -%}
+            {%- set _getAction.action =  cmd[3:] -%}
+            {%- set _getAction.mode = "weekplan" -%}
+
+          {%- elif  cmd is search("^\d*[.,]{0,1}\d*$")  or cmd is number -%}
+            {%- set _getAction.action = cmd|string|replace(",", ".")|float -%}
+            {%- set _getAction.mode = "temp" -%}
+
+          {%- elif  cmd == "off"  -%}
+            {%- set _getAction.action = none -%}
+            {%- set _getAction.mode = "off" -%}
+
+          {%- elif  cmd is search("^boost!") -%}
+            {%- set _getAction.mode = "boost" -%}
+            {%- set _getAction.action =  cmd[7:] -%}
+
+          {% endif %}
+          {%- set myaction = {
+            "action": _getAction.action or cmd,
+            "mode": _getAction.mode
+            }
+            -%}
+          {{- myaction|to_json -}}
+
+
+        {%- endmacro -%}
+        {# ___________________________________________________ #}
+
+
+
+        {# ___________________________________________________ #}
+        {%- macro createAction(c_dev, c_cmd, c_item) -%}
+          {%- set _action = namespace() -%}
+
+          {%- set _action.device      = c_dev -%}
+          {%- set _action.item        = c_item -%}
+          {%- set _action.class       = getPartOfAttr( _action.device, "model", '-', 0, "-") -%}
+          {%- set _action.integration = getPartOfAttr( _action.device, "interface_id", '-', 0, "-") -%}
+          {%- set _action.deviceID    = device_id(_action.device) -%}
+          {%- set _action.cmd         = c_cmd -%}
+          {%- set _action.submode     = none -%}
+          {%- set _action.mode        = none -%}
+          {%- set _action.action      = none -%}
+          {%- set _action.subdevice   = none -%}
+
+
+          {%- if _action.class == "HM" and _action.integration == "homematic" -%}
+            {%- set subdevs = states.select | selectattr('entity_id', 'search', 'presetmodes$') | map(attribute='entity_id')|list -%}
+            {%- set name = state_attr(c_dev, 'friendly_name').split(" ") -%}
+            {% if name is list and name|length > 0 %}
+              {%- set name = name[0] ~ "_presetModes"-%}
+              {%- for subdev in subdevs -%}
+                {%- if state_attr(subdev, 'friendly_name') == name -%}
+                  {%- set _action.subdev = subdev -%}
+                  {%- break -%}
+                {%- endif -%}
+              {%- endfor -%}
+            {% endif %}
+          {% endif %}
+
+          {%- set cmds = getAction(c_cmd)|from_json -%}
+          {%- set _action.mode = cmds.mode -%}
+          {%- set _action.action = cmds.action -%}
+          {%- if  _action.mode == "boost" -%}
+            {%- set cmds = getAction(_action.action)|from_json -%}
+            {%- set _action.submode = cmds.mode -%}
+            {%- set _action.action = cmds.action -%}
+          {% endif %}
+
+          {%- set myaction = [{
+            "device": _action.device,
+            "set": _action.mode, 
+            "item": _action.item, 
+            "integration": _action.integration, 
+            "cmd": _action.cmd, 
+            "class": _action.class, 
+            "subdevice": _action.subdevice, 
+            "deviceID": _action.deviceID, 
+            "submode": _action.submode, 
+            "action" : _action.action
+            }]
+            -%}
+          {{- myaction|to_json -}}
+
+        {%- endmacro -%}
+        {# ___________________________________________________ #}
+
         {%- set ns = namespace() -%}
         {%- set ns.cmd = default_cmd -%}
         {%- set ns.sequence = sequence.split(",") -%}
         {%- set ns.debug = "" -%}
         {%- set ns.devices = [] -%}
         {%- set ns.manipulated_devices = [] -%}
-       
+        {%- set ns.usedWeekplanes = [] -%}
+        {%- set ns.weekplanes = [] -%}
+        {#
+        ns.cmd wird über die Switches befüllt/geändert
+        wenn mode exclusiv == true > break
+        #}
         {%- set ns.userbreak = false -%}
         {%- for switch in switches -%}
           {%- if switch.device and switch.device != "-" -%}
@@ -580,18 +731,30 @@ action:
           {%- endif -%}
         {%- endfor -%}
 
+        {#
+        ns.cmd wird über den Status der persons befüllt/geändert wenn kein switch den mode exclusiv auf true hatte
+        #}
+
         {%- if not ns.userbreak -%}
           {%- set ns.usercmd = "{}" -%}
           {%- set ns.debug = ns.debug ~ "<p>persons:<br>" -%}
           {%- for person in linked_persons -%}
             {%- set name = getName(person) -%}
             {%- set state = states(person) -%}
+            {%- set mystates = state.split("!") -%}
+            {%- if mystates is list and mystates|length > 1 -%}
+              {%- set state = mystates[1] -%}
+              {%- set name = mystates[0] -%}
+            {%- endif -%}
+
+
             {%- set ns.debug = ns.debug ~ "<i>" ~ name ~ " : " ~ state ~ "<i/><br>" -%}
             {%- set ns.usercmd = getSettings(name, state, jsonCmd) -%}
             {%- set ns.cmd = mergeCmd(ns.cmd, ns.usercmd) -%}
+            {#
+            #}
           {%- endfor -%}
           {%- set ns.debug = ns.debug ~ "</p>" -%}
-
         {%- endif -%}
         {%- set ns.cmd = ns.cmd|from_json -%}
 
@@ -600,26 +763,28 @@ action:
         {%- set tmp.integrations = [] -%}
 
         {%- for key in tmp.usedIntegrations -%}
-          {%-if not key in tmp.integrations|map(attribute='key')|list -%}
-            {%-set tmp.integrations = tmp.integrations + [{"key": key, "dev": integration_entities(key)}] -%}    
-          {%-endif -%}
+          {%- if not key in tmp.integrations|map(attribute='key')|list -%}
+            {%- set tmp.integrations = tmp.integrations + [{"key": key, "dev": integration_entities(key)}] -%}    
+          {%- endif -%}
         {%- endfor -%}
 
         {%- for device in linked_heatings -%}
           {%- for itm, val in ns.cmd.items() -%}
-            {%- if state_attr(device, 'friendly_name') is match(itm) -%}
+            {%- if state_attr(device, 'friendly_name') is match(itm) and not device in ns.manipulated_devices|map(attribute='device')|list -%}
+              {%- set tmp.myintegration = "else" -%}
+              {%- set tmp.action = none -%}
               {%- for integration in tmp.integrations -%}
-                {%-if integration.dev and integration.key and device in integration.dev -%}
-                  {%-if integration.key == "homematicip_local" -%}
-                    {%-if not device in ns.manipulated_devices|map(attribute='device')|list -%}
-                      {%- set action = createAction_hmip(device, val, itm) -%}
-                      {%-if action -%}
-                        {%-set ns.manipulated_devices = ns.manipulated_devices + action|from_json -%}    
-                      {%-endif -%}
-                    {%-endif -%}
-                  {%-endif -%}
-                {%-endif -%}
+                {%- if integration.dev and integration.key and device in integration.dev -%}
+                  {%- set tmp.myintegration = integration.key -%}
+                  {%- break -%}
+                {%- endif -%}
               {%- endfor -%}
+              {%- set tmp.action = createAction(device, val, itm) -%}
+
+
+              {%- if tmp.action and tmp.action != "" -%}
+                {%- set ns.manipulated_devices = ns.manipulated_devices + tmp.action|from_json -%}    
+              {%- endif -%}
             {%- endif -%}
           {%- endfor -%}        
         {%- endfor -%}
@@ -635,6 +800,8 @@ action:
         metadata: {}
         data:
           message: '{{debugmessage_post ~ "default :<BR/>" ~ default_cmd ~ "<hr>" ~ my_settings.debug ~ "<BR/>Result :<BR/>" ~ my_settings.data ~ "<BR/>devices :<BR/>" ~ my_settings.devices }}'    
+
+# DEVICE: HM-IP, SET: programm
   - variables:
       my_devices: '{{  my_settings.devices | selectattr("class", "==", "HmIP")| selectattr("set", "==", "program") | list }}'
 
@@ -687,12 +854,12 @@ action:
         - action: climate.set_preset_mode
           alias: set Wochenprogramm
           data:
-            preset_mode: "{{- my_devices[repeat.index - 1].action -}}"
+            preset_mode: '{{- "week_program_" ~ my_devices[repeat.index - 1].action -}}'
           target:
             device_id: "{{- my_devices[repeat.index - 1].deviceID -}}"
            
             
-                
+# DEVICE: HM, SET: programm                
   - variables:
       my_devices: '{{  my_settings.devices | selectattr("class", "==", "HM") | selectattr("subdevice", "defined") | selectattr("set", "==", "program") | list }}'
 
@@ -720,7 +887,9 @@ action:
           target:
             device_id: "{{- my_devices[repeat.index - 1].subdevice -}}"
           data:
-            option: "{{- my_devices[repeat.index - 1].action -}}"
+            option: '{{- "week_program_" ~ my_devices[repeat.index - 1].action -}}'
+
+# DEVICE: HM-IP HM, SET: off
 
   - variables:
       my_devices: '{{  my_settings.devices | selectattr("class", "match", "^H[Mm].*") | selectattr("set", "==", "off") | list }}'
@@ -746,6 +915,7 @@ action:
           target:
             device_id: "{{- my_devices[repeat.index - 1].deviceID -}}"
 
+# DEVICE: HM-IP HM, SET: Temp
 
   - variables:
       my_devices: '{{  my_settings.devices | selectattr("class", "match", "^H[Mm].*") | selectattr("set", "==", "temp") | list }}'
@@ -776,6 +946,60 @@ action:
           target:
             device_id: "{{- my_devices[repeat.index - 1].deviceID -}}"
 
+# DEVICE: not HM-IP not HM, SET: off
+
+  - variables:
+      my_devices: '{{  my_settings.devices | selectattr("class", "equalto", "-") | selectattr("set", "equalto", "off") | list }}'
+
+# Debug - Message  Devices    
+  - if:
+      - condition: template
+        value_template: "{{debugmode and my_devices|length > 0}}"
+    then:
+      - action: notify.persistent_notification
+        metadata: {}
+        data:
+          message: '{{"<u>Devices</u><br>filtered by<BR>class= -, set=off  <BR>" ~ my_devices}}'    
+
+  - repeat:
+      count: "{{my_devices|length|int}}"
+      sequence:
+        - action: climate.turn_off
+          metadata: {}
+          data: {}
+          target:
+            entity_id: "{{- my_devices[repeat.index - 1].device -}}"      
+
+# DEVICE: not HM-IP not HM, SET: off
+
+  - variables:
+      my_devices: '{{  my_settings.devices | selectattr("class", "equalto", "-") | selectattr("set", "equalto", "temp") | list }}'
+
+# Debug - Message  Devices    
+  - if:
+      - condition: template
+        value_template: "{{debugmode and my_devices|length > 0}}"
+    then:
+      - action: notify.persistent_notification
+        metadata: {}
+        data:
+          message: '{{"<u>Devices</u><br>filtered by<BR>class= -, set=temp  <BR>" ~ my_devices}}'    
+
+  - repeat:
+      count: "{{my_devices|length|int}}"
+      sequence:
+        - action: climate.turn_on
+          metadata: {}
+          data: {}
+          target:
+            entity_id: "{{- my_devices[repeat.index - 1].device -}}"
+        - action: climate.set_temperature
+          metadata: {}
+          data:
+            temperature: "{{- my_devices[repeat.index - 1].action -}}"
+            hvac_mode: auto
+          target:
+            entity_id: "{{- my_devices[repeat.index - 1].device -}}"     
 
 mode: single
 
