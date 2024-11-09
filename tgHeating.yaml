@@ -1,19 +1,23 @@
 blueprint:
   name: tgHeating
   domain: automation
-  description: Heating Configuration based on state of persons or users
+  description: Heating Control based on state of persons in combination with switches
+  source_url: https://github.com/quietcry/tgHeating/tgHeating,yaml
+  homeassistant:
+    min_version: 2023.12.0
   input:
     debugmode:
       name: "debug mode"
+      description: Configuration<br>ldesngorw
       default: false
       selector:
         boolean:
 
     conf_persons:
-      name: relevant people
+      name: person state entities
       icon: mdi:cog
       collapsed: true
-      description: Configuration
+      description: Configuration 
       input:  
         linked_persons:
           name: persons or text-helpers with state of persons
