@@ -57,6 +57,18 @@ blueprint:
           name: "sequence"
           default: 'on,off,boost,$temperature,WP,P'
 
+    conf_statusfile:
+      name: store in statefile
+      icon: mdi:cog
+      collapsed: true
+      description: Configuration
+      input:  
+        use_statefile:
+          name:  "state file path:"
+          default: '-'
+          selector:
+            text:
+              multiline: false
 
     conf_weekplan:
       name: Weekplan Configuration
@@ -65,29 +77,29 @@ blueprint:
       description: Configuration
       input:  
         weekplan_cmd:
-          name:  "default:"
-          default: '{"plan1":{"1":["14:54-P!3","00:09-P!3","24:00-P!1"],"2":"15:30-p5","3":"3:plan2","4":"1:plan2"}}'
+          name:  "Weekplans:"
+          default: '{"plan1":{"1":["14:54-P>3","00:09-P>3","24:00-P>1"],"2":"15:30-p5","3":"3:plan2","4":"1:plan2"}}'
           selector:
             text:
               multiline: true
 
-        weekplan_helper:
-          name: "Weekplan-Helfer"
+        weekplan_timer:
+          name: "Weekplan-Timer"
           default: '-'
           selector:
             entity:
               multiple: false
               filter:
                 domain:
-                  - input_datetime
+                  - timer
 
 
     jsonCmd:
       name: 'JSON Command line'
       default: '{
                 "tommy":  {
-                          "playtime":{"WZ":"P!3", "KU":24, "AZ":"P!2"},
-                          "home":{"AZ":"P!1"}
+                          "playtime":{"WZ":"P>3", "KU":24, "AZ":"P>2"},
+                          "home":{"AZ":"P>1"}
                           }
                 }'
       selector:
@@ -300,9 +312,17 @@ blueprint:
             boolean:
 
 variables:
+  cmdStrTstPatternDict: '^[\s]*\{[\s\S]*\}[\s]*$'
+  cmdStrTstPatternList: '^[\s]*\[[\s\S]*\][\s]*$'
+  cmdStrTstPatternNumPK: '^\d*[.,]{0,1}\d*$'
+  cmdStrTstPatternNumP:  '^\d*\.{0,1}\d*$'
+
   linked_persons: !input linked_persons
   linked_heatings: !input linked_heatings
-  weekplan_helper: !input weekplan_helper
+  use_statefile: !input use_statefile
+  weekplan_timer: !input weekplan_timer
+  weekplan_cmd: !input weekplan_cmd
+  weekplan_delay_seconds: 5
 
   jsonCmd: !input jsonCmd
   sequence: !input sequence
@@ -311,6 +331,7 @@ variables:
   coolingmode: true
   switches:   [
               {
+              'name': "switch_1",  
               'device': !input switch_1_device,
               'on_cmd': !input switch_1_on_cmd,
               'on_mode': !input switch_1_on_mode,
@@ -318,6 +339,7 @@ variables:
               'off_mode': !input switch_1_off_mode,
               },
               {
+              'name': "switch_2",  
               'device': !input switch_2_device,
               'on_cmd': !input switch_2_on_cmd,
               'on_mode': !input switch_2_on_mode,
@@ -325,6 +347,7 @@ variables:
               'off_mode': !input switch_2_off_mode,
               },
               {
+              'name': "switch_3",  
               'device': !input switch_3_device,
               'on_cmd': !input switch_3_on_cmd,
               'on_mode': !input switch_3_on_mode,
@@ -332,6 +355,7 @@ variables:
               'off_mode': !input switch_3_off_mode,
               },
               {
+              'name': "switch_4",  
               'device': !input switch_4_device,
               'on_cmd': !input switch_4_on_cmd,
               'on_mode': !input switch_4_on_mode,
@@ -339,6 +363,7 @@ variables:
               'off_mode': !input switch_4_off_mode,
               },
               {
+              'name': "switch_5",  
               'device': !input switch_5_device,
               'on_cmd': !input switch_5_on_cmd,
               'on_mode': !input switch_5_on_mode,
@@ -356,6 +381,7 @@ variables:
     {%- endmacro -%}
     {%- set ns = namespace()%}
     {%- set ns.myEntities = linked_persons -%}
+
     {%- set status = observer(switches)  -%}
     {{- ns.myEntities -}}
 
@@ -372,43 +398,452 @@ trigger:
     to: "off"
     id: "reloadConfig"
 
-  # - platform: template
-  #   value_template: >-
-      # {#
-      # {%- if states(weekplan_helper) != 'unknown' -%}
-      #   {%- set stamp = state_attr(weekplan_helper, "timestamp")|int -%}
-      #   {%- set _now = now().timestamp()|int -%} 
-      #   {% if stamp <= _now and (stamp + 1) >= _now  -%}true{%- endif -%}
-      # {%- endif -%}
-      #}
-    # id: weekplan
-
 condition:
   - condition: or
     conditions:
       - condition: trigger
         id:
           - haStart
-          - weekplan
           - reloadConfig
       - condition: template
         value_template: " {%- if trigger.event.data.entity_id in observed -%}true{%- endif -%}"
-
+      - condition: template
+        value_template: " {%- if trigger.event.data.entity_id == weekplan_timer and states(weekplan_timer) != 'active' -%}true{%- endif -%}"
+      - condition: template
+        value_template: >-
+          {%- if jsonCmd is search("^input_text\.[a-z0-9_-]+$") -%}
+            {%- if trigger.event.data.entity_id in states | selectattr("entity_id", "equalto", jsonCmd ) | map(attribute='entity_id') | list -%}
+              {{- true -}}
+            {%- else -%}
+              {%- set mylist = [] -%}
+              {%- set config = states(jsonCmd) -%}{%- if config is defined and config is search(cmdStrTstPatternDict) -%}{%- set config = config|from_json -%}{%- else -%}{%- set config = {} -%}{%- endif -%}
+              {%- if "persons" in config and config["persons"] is list -%} {%- set mylist = mylist + config["persons"] -%} {%- endif -%}
+              {%- if "switches" in config and config["switches"] is list -%} {%- set mylist = mylist + config["switches"] | map(attribute='device' , default="undefind") | list -%} {%- endif -%}
+              {%- if trigger.event.data.entity_id in mylist -%}
+                {{- true -}}
+              {%- else -%}
+                {{- false -}}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endif -%}
 action:
   - variables:
       debugmessage_pre:  "<u>debugmode pre</u><BR/>"
       debugmessage_post: "<u>debugmode post</u><BR/>"
 
+  - variables:
+      myConfig: >-
+        {# ___________________________________________________ #}
+        {%- macro readconfig() -%}
+          {#
+          {"switches":[{"name":"switch_37","device":"input_boolean.personbewohner_01activ"}],"persons":["person.tommy","input_text.status_bewohner_01"],"devices":["mydevice"]}
+          #}
+          {%- set cfg = namespace() -%}
+          {%- set cfg.persons = [] + linked_persons -%}
+          {%- set cfg.devices = [] + linked_heatings -%}
+          {%- set cfg.sequence = sequence -%}
+          {%- set cfg.defaultCmd = default_cmd -%}
+          {%- set cfg.switches = [] -%}
+          {%- set cfg.weekplans = { "timer":weekplan_timer,
+                                    "plans":weekplan_cmd
+                                  } -%}
+          {%- set cfg.statefile = use_statefile -%}
+          {%- set cfg.cmd = jsonCmd -%}
+          {%- set cfg.debug = "" -%}
+          {%- set myswitches = switches -%}
+
+          {%- if jsonCmd is search("^input_text\.[a-z0-9_-]+$") 
+            and jsonCmd in states | selectattr("entity_id", "equalto", jsonCmd ) | map(attribute='entity_id') | list -%}
+            {%- set config = states(jsonCmd) -%}{%- if config is defined and config is search(cmdStrTstPatternDict) -%}{%- set config = config|from_json -%}{%- else -%}{%- set config = {} -%}{%- endif -%}
+            {%- if "persons" in config and config["persons"] is list -%}
+              {%- for item in config["persons"] -%}
+                {%- if not item in cfg.persons -%} 
+                  {%- set cfg.persons = cfg.persons + [item] -%}
+                {%- endif -%}
+              {%- endfor -%} 
+            {%- endif -%}
+            {%- if "devices" in config and config["devices"] is list -%}
+              {%- for item in config["devices"] -%}
+                {%- if not item in cfg.devices -%} 
+                  {%- set cfg.devices = cfg.devices + [item] -%}
+                {%- endif -%}
+              {%- endfor -%} 
+            {%- endif -%}
+            {%- if "sequence" in config and config["sequence"] is string and config["sequence"] != "" -%}
+              {%- set cfg.sequence = config["sequence"] -%}
+            {%- endif -%}
+            {%- if "defaultCmd" in config and config["defaultCmd"] is mapping -%}
+              {%- set cfg.defaultCmd = config["defaultCmd"] -%}
+            {%- endif -%}
+            {%- if "cmd" in config and config["cmd"] is mapping -%}
+              {%- set cfg.cmd = config["cmd"]|to_json -%}
+            {%- endif -%}
+            {%- if "switches" in config and config["switches"] is list -%}
+              {%- set myswitches = config["switches"] + myswitches -%}
+            {%- endif -%}
+            {%- if "weekplans" in config and config["weekplans"] is mapping -%}
+              {%- set cfg.weekplans = config["weekplans"] -%}
+            {%- endif -%}
+          {%- endif -%}
+
+
+          {%- set keys = myswitches| map(attribute='name' , default="undefind") | list | sort %}
+          {%- for key in keys -%}
+            {%- for switch in myswitches -%}
+              {%- if "name" in switch and switch["name"] == key and "device" in switch and states(switch["device"]|string) != "unknown"-%}
+                {% set cfg.switches = cfg.switches + [switch] %}
+              {%- endif -%} 
+            {%- endfor -%}
+          {%- endfor -%} 
+
+          {%- if cfg.statefile is defined and cfg.statefile is string and cfg.statefile != '-'-%}
+            {%- set cfg.statefile = {"file":cfg.statefile, "used":true, "content":"not readed"} -%}
+          {%- else -%}
+            {%- set cfg.statefile = {"file":cfg.statefile, "used":false} -%}
+          {%- endif -%}
+          {%- if cfg.sequence is string -%}
+            {%- set cfg.sequence = cfg.sequence.split(",") -%}
+          {%- endif -%}
+          {%- if not cfg.cmd is string or not cfg.cmd is search(cmdStrTstPatternDict) -%}
+            {%- set cfg.cmd = "{}" -%}
+          {%- endif -%}
+          {%- if not cfg.defaultCmd is string or not cfg.defaultCmd is search(cmdStrTstPatternDict)-%}
+            {%- set cfg.defaultCmd = "{}" -%}
+          {%- endif -%}
+
+
+          {%- set config = {
+            "persons"   : cfg.persons,
+            "devices"   : cfg.devices,
+            "sequence"  : cfg.sequence,
+            "switches"  : cfg.switches,
+            "cmd"       : cfg.cmd,
+            "weekplans" : cfg.weekplans,
+            "statefile" : cfg.statefile,
+            "defaultCmd": cfg.defaultCmd
+            } -%}
+          {{- config -}}
+        {%- endmacro -%}
+        {# ___________________________________________________ #}
+
+        {%- set config = namespace() -%}
+        {{- readconfig() -}}
   - if:
       - condition: template
         value_template: "{{debugmode}}"
     then:
+      - variables:
+          debugMsg: >-
+            {# ___________________________________________________ #}
+            {%- macro stringify(val) -%}
+              {%- if val is list -%}
+                {%- set m.msg = m.msg ~ "<ul>" -%} 
+                {%- for item in val -%}
+                  {%- set m.msg = m.msg ~ "<li>" -%}
+                  {%- set x=stringify(item) -%}  
+                  {%- set m.msg = m.msg ~ "</li>" -%} 
+                {%- endfor -%}
+                {%- set m.msg = m.msg ~ "</ul>" -%} 
+              {%- elif val is mapping -%}
+                {%- for name, item in val.items() -%}
+                  {%- set m.msg = m.msg ~ "<ul><li>" ~ name -%}
+                  {%- if item is string and item is not search(cmdStrTstPatternDict) and item is not search(cmdStrTstPatternList) -%}
+                    {%- set m.msg = m.msg ~ ": " ~ item -%}
+                  {%- else -%}
+                    {%- set m.msg = m.msg ~ "<ul>" -%}
+                    {%- set x=stringify(item) -%}
+                    {%- set m.msg = m.msg ~ "</ul>" -%}
+                  {%- endif -%}
+                  {%- set m.msg = m.msg ~ "</li></ul>" -%} 
+                {%- endfor -%}
+              {%- elif val is string and val is search(cmdStrTstPatternList)  -%}
+                {%- set val = val | from_json -%} 
+                {%- for item in val -%}
+                  {%- set m.msg = m.msg ~ "<li>" -%}
+                  {%- set x=stringify(item) -%}  
+                  {%- set m.msg = m.msg ~ "</li>" -%} 
+                {%- endfor -%}
+              {%- elif val is string and val is search(cmdStrTstPatternDict)  -%}
+                {%- set val = val | from_json -%}
+                {%- for name, item in val.items() -%}
+                  {%- set m.msg = m.msg ~ "<ul><li>" ~ name -%}
+                  {%- if item is string and item is not search(cmdStrTstPatternDict) and item is not search(cmdStrTstPatternList) -%}
+                    {%- set m.msg = m.msg ~ ": " ~ item -%}
+                  {%- else -%}
+                    {%- set m.msg = m.msg ~ "<ul>" -%}
+                    {%- set x=stringify(item) -%}
+                    {%- set m.msg = m.msg ~ "</ul>" -%}
+                  {%- endif -%}
+                  {%- set m.msg = m.msg ~ "</li></ul>" -%} 
+                {%- endfor -%}
+              {%- elif val is string or val is number -%}
+                {%- set m.msg = m.msg ~ "" ~ val ~ "" -%} 
+              {%- endif -%}
+            {%- endmacro -%}
+            {# ___________________________________________________ #}
+
+            {%- set m = namespace() -%}  
+            {%- set m.msg = "Konfigurations:<ul>" -%}  
+            {%- for key, val  in myConfig.items() -%}
+              {%- set m.msg = m.msg ~ "<li><i><b>" ~ key ~ ":</b></i>" -%}
+              {%- set x=stringify(val) -%}  
+              {%- set m.msg = m.msg ~ "</li>" -%}  
+            {%- endfor -%}
+            {%- set m.msg = m.msg ~ "</ul>" -%}  
+            {{m.msg}}
+
+
       - action: notify.persistent_notification
         metadata: {}
         data:
-          message: "{{debugmessage_pre}}<BR/><i><b> observed Devices:</b></i><BR/>{{observed}}}<BR/><i><b> default Cmd:</b></i><BR/>{{default_cmd}}"
+          title: "Debug TgHeating"
+          message: >-
+
+            {{debugMsg}}
+            Konfiguration:<ul>{%- for key, val  in myConfig.items() -%}<li><i><b>{{key}}:</b></i>
+            {%- if val is list -%}
+              <ul>
+              {%- for item in val -%}
+              <li>{{- item -}}</li>
+              {%- endfor -%}
+              </ul>
+            {%- else -%}            
+              <ul><li>{{- val -}}</li></ul>
+            {%- endif -%}
+            </li>
+            {%- endfor -%}</ul>
+            triggered by: <ul><li>{%- if "id" in trigger -%}{{- trigger["id"] }}{%- endif %} [<i>{%- if "entity_id" in trigger -%}{{- trigger["entity_id"] }}{%- else -%}{{- trigger -}}{%- endif -%}</i>]</li></ul>
+  - if:
+      - condition: template
+        value_template: "{{- myConfig.statefile.used -}}"
+    then:
+      - action: shell_command.read_from_file
+        data:
+          file: "{{myConfig.statefile.file}}"
+        response_variable: statefile_state
   - variables:
+      my_weekplan: >-
+        {#- ___________________________________________________ -#}
+        {%- macro getSeconds(days, strg, mode="next") -%} 
+          {%- set ns1 = namespace() -%}   
+          {%- set ns1.strg = strg|string -%}
+          {%- for counter in range(0 , 4 ) -%}
+            {%- if ns1.strg|length < 4  -%}
+              {%- set ns1.strg = "0" ~ ns1.strg -%}
+            {%- else -%}
+              {%- break -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {%- set ns1.dann = ns.midnight + timedelta(hours=(ns1.strg[:2]|int), minutes=(ns1.strg[2:]|int )) -%}
+          {%- if mode == "next" -%}
+            {%- set ns1.dann = ns1.dann + timedelta(days=(days|int)) -%}
+            {%- set ns1.dann = (as_timestamp(ns1.dann) - as_timestamp(ns.jetzt))|int -%}
+          {%- else -%}
+            {%- set ns1.dann = ns1.dann - timedelta(days=(days|int)) -%}
+            {%- set ns1.dann = (as_timestamp(ns.jetzt) - as_timestamp(ns1.dann))|int -%}
+          {%- endif -%}
+          {{ns1.dann}}
+        {%- endmacro -%}
+        {#- ___________________________________________________ -#}
+        
+        {#- ___________________________________________________ -#}
+        {%- macro getDayPlan(dayoffset, wplanAsName, planDay, mode, counter=0) -%}
+          {%- set gdp = namespace() -%}
+          {%- set wplan = (ns.weekplans[wplanAsName] or {} ) -%}
+          {%- set gdp.result = none -%}
+          {%- set gdp.counter = counter -%}
+          {%- set gdp.planDay = planDay -%}
+          {%- if gdp.planDay < 1 -%}{%- set gdp.planDay = gdp.planDay +7 -%}{%- endif -%}         
+          {%- if gdp.planDay|string in wplan -%}
+
+            {%- set dplan = wplan[gdp.planDay|string] -%}
+            {#           
+            {%- set ns.debug = ns.debug ~ "|#| = " ~ (gdp.planDay) ~ "-" ~ gdp.counter ~ "-" ~ dayoffset ~ " >> " ~ dplan ~"<br>"-%}
+            #}
+            {%- set gdp.counter = gdp.counter + 1 -%}
+            {%- if gdp.counter > 7 -%}
+              {%- set gdp.result = none -%}
+            {%- elif dplan is list -%}
+              {%- set gdp.result = dplan -%}
+            {%- elif dplan is string and dplan is match("^\*$")-%}
+              {%- set gdp.result = getDayPlan(dayoffset, wplanAsName, (gdp.planDay-1), mode, gdp.counter)|from_json -%}
+            {%- elif dplan is string and dplan is match("^\d$") and dplan|int >= 1 and dplan|int <= 7 -%}
+              {%- set gdp.result = getDayPlan(dayoffset, wplanAsName, (dplan|int), mode, gdp.counter)|from_json -%}
+            {%- elif dplan is string and dplan is match("^\d:.+$" ) and dplan[:1]|int >= 1 and dplan[:1]|int <= 7 -%}
+              {%- if dplan[2:] is in ns.weekplans-%}
+                {%- set gdp.result = getDayPlan(dayoffset, dplan[2:], (dplan[:1]|int), mode, gdp.counter)|from_json -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endif -%}
+          {%- if gdp.result != none and gdp.counter == 1 -%}
+           
+            {%- if gdp.result is list -%}
+              {%- set gdp.plan = [] -%}            
+              {% for item in gdp.result %}           
+                {%- if item is string and item is match("^\d{1,2}:\d{1,2}-.*$")-%}
+                  {%- set itemx = item.split("-") -%} {%- set item1 = itemx[0].split(":") -%} {%- set item1 = (item1[0] ~ item1[1])|int -%}                     
+                  {%- set gdp.plan = 
+                    gdp.plan + 
+                      [
+                        {
+                        "time":item1,
+                        "action": item[(itemx[0]|length + 1):], 
+                        "timestring": itemx[0],
+                        "secondsFromNow": getSeconds(dayoffset, item1, mode),
+                        "day": gdp.planDay,
+                        "dayoffset": dayoffset
+                        }
+                      ] -%}
+                {%- endif -%}
+              {%- endfor -%}
+              {%-set gdp.result = gdp.plan -%}
+            {%- else -%}
+              {%- set gdp.result = none -%} 
+            {%- endif -%}
+          {%- endif -%}
+          {%- if gdp.result is list and gdp.result|length == 0 -%}{%-set gdp.result = None -%}{%- endif -%}
+          {{- gdp.result|to_json -}}
+        {%- endmacro -%}
+        {#- ___________________________________________________ -#}
+
+        {#- ___________________________________________________ -#}
+        {%- macro getPlanItem(plan, cT, mode) -%}
+          {%- set result = none -%}
+          {%- set gca = namespace() -%}
+          {%- set gca.planTimes = [] -%}
+          {%- set gca.currentItem = none -%}
+          {%- if plan is list -%}
+            {%- set plan = plan | sort(attribute="time") -%}
+            {% for item in plan %}
+              {%- if mode == "last" and item.time <= cT and ( gca.currentItem == none or item.time > gca.currentItem.time ) -%}
+                {%- set gca.currentItem = item -%}
+              {%- elif mode == "next" and item.time > cT and ( gca.currentItem == none or item.time < gca.currentItem.time ) -%}
+                {%- set gca.currentItem = item -%}
+              {%- endif -%}
+            {%- endfor -%}
+           {%- set result = gca.currentItem  -%}
+          {%- endif -%}
+          {{- result|to_json -}}         
+        {%- endmacro -%}
+        {#- ___________________________________________________ -#}
+
+        {#- ___________________________________________________ -#}
+        {%- macro getcurrentItemFromPlan(planName, startday, mode="next") -%}
+          {%- set gci = namespace() -%}
+          {%- set gci.day = startday -%}
+          {%- set gci.result = none -%}
+
+          {% for dayoffset in range(0 , 7 ) %}
+            {%- if mode == "last" -%}
+              {%- set gci.compareTime = 2400 -%}
+              {%- set gci.day = gci.day - 1 -%} 
+              {%- if gci.day < 1 -%} 
+                {%- set gci.day = gci.day + 7 -%}
+              {%- endif -%}
+            {%- else -%} 
+              {%- set gci.compareTime = 0 -%}
+              {%- set gci.day = gci.day + 1 -%} 
+              {%- if gci.day > 7 -%} 
+                {%- set gci.day = gci.day - 7 -%}
+              {%- endif -%}
+            {%- endif -%}
+            {%- if dayoffset == 0 -%}
+              {%- set gci.day = startday -%} 
+              {%- set gci.compareTime = ns.jetzt.strftime('%H%M')|int -%} 
+            {%- endif -%}
+            {%- set gci.result = getDayPlan(dayoffset, planName, gci.day, mode, 0)|from_json -%}
+            {#
+            {%- set ns.debug = ns.debug ~ "result gci "~ gci.day ~" " ~ dayoffset ~" = " ~ gci.result ~"<br>"-%}
+            #}
+            {%- if gci.result != none -%}
+              {%- set gci.result = getPlanItem(gci.result, gci.compareTime, mode)|from_json -%} 
+
+              {%- if gci.result != none -%}
+                {%- break -%}
+              {%- endif -%}  
+            {%- endif -%}  
+          {% endfor %}
+          {{- gci.result|to_json -}} 
+        {%- endmacro -%}
+        {#- ___________________________________________________ -#}
+
+
+        {#- ___________________________________________________ -#}
+        {%- set ns = namespace() -%}
+        {%- set ns.cfg = myConfig.weekplans -%}
+        {%- set ns.result = "false" -%}
+        {%- set ns.debug = "<ul>" -%}
+        {%- set ns.jetzt = now() -%}
+        {%- set ns.midnight = strptime(ns.jetzt.strftime('%d-%m-%Y'), "%d-%m-%Y") -%}
+        {%- set ns.current = [] -%}        
+
+        {%- if "timer" in ns.cfg and ns.cfg["timer"] != "-" and states(ns.cfg["timer"]) != "unknown" and "plans" in ns.cfg and ns.cfg["plans"] is search(cmdStrTstPatternDict) -%}
+          {%- set ns.weekplans = ns.cfg["plans"]|from_json -%}
+          {%- set days = [7,1,2,3,4,5,6] -%}
+          {%- set today = days[ns.jetzt.strftime('%w')|int] -%}
+          {%- set ns.next = 0 -%}
+
+          {%- for WPname, plan in ns.weekplans.items()-%}
+            {%- set ns.zeit = getcurrentItemFromPlan(WPname, today, "next")|from_json -%}        
+            {%- if ns.zeit != none -%}
+              {%- set tp = ns.zeit.secondsFromNow|int + weekplan_delay_seconds|int -%}
+              {%- if not ns.next  or ns.next > tp or ns.next == 0-%}{%- set ns.next = tp -%}{%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+          
+          {%- for WPname, plan in ns.weekplans.items()-%}
+            {%- set cur = getcurrentItemFromPlan(WPname, today, "last")|from_json -%}
+            {%- if cur != none -%}
+              {%- set ns.current = ns.current + [{WPname:cur}] -%}
+            {%- endif -%}
+          {%- endfor -%}        
+          
+          
+          {%- set dann = (ns.jetzt + timedelta(seconds=ns.next|int)) -%}
+          {%- set ns.event_debug = "<ul><li>" ~ dann.strftime("%d-%m-%Y %H:%M") ~ " [" ~ (ns.next/60)|round|int ~ "min]</li></ul>" -%}
+
+          {%- set ns.status = "<ul>" -%}
+          {%- for item in ns.current -%}
+            {%- for key, val in item.items()-%}
+              {%- set ns.status = ns.status ~ "<li>" ~ key ~ ": " ~ val ~ "</li>" -%}
+            {%- endfor -%}
+          {%- endfor -%}
+          {%- set ns.status = ns.status ~ "</ul>" -%}
+
+          
+          {% set ns.debug = ns.debug ~ "\n<li>last Weekplan Status:" ~ ns.status ~ "</li>" %}
+          {% set ns.debug = ns.debug ~ "\n<li>next Weekplan Event:" ~  ns.event_debug ~  "</li>" %}
+          {% set ns.debug = ns.debug ~ "\n<li>current:" ~  ns.current ~  "</li>" %}
+          
+
+          {%- set ns.debug = ns.debug ~ "</ul>" -%}
+
+          {{ {"next": ns.next, "current": ns.current, "debug": ns.debug } }}
+        {%- else -%}
+          {{ {"next": false, "current": false, "debug": "<ul><li>no weekplan in use</li></ul>" } }}
+
+        {%- endif -%}
+
+
+        
+
+
+
+
+
+
+
       my_settings: >-
+        {# ___________________________________________________ #}
+        {%- macro isCmdString(val) -%}
+          {%- if val is string and val is search(cmdStrTstPatternDict) -%}
+            {{- val -}}
+          {%- else -%}
+            {{- "{}" -}}
+          {%- endif -%}              
+        {%- endmacro -%}
+        {# ___________________________________________________ #}
+
         {# ___________________________________________________ #}
         {%- macro getFormated(val) -%}
           {%- if val is number -%}
@@ -436,50 +871,58 @@ action:
         {# ___________________________________________________ #}
         {%- macro sortVal(val1, val2) -%}
           {%- set _sortValNS = namespace() -%}
-          {%- set srch1 = (val1|string).split("!") -%}
-          {%- set srch2 = (val2|string).split("!") -%}
 
+
+          {%- set srch1 = (val1|string).split(">") -%}
+          {%- set srch2 = (val2|string).split(">") -%}
           {%- set _sortValNS.retVal = none -%}
-          {%- for seq in ns.sequence|reverse -%}
-            {#
-            {%- set ns.debug = ns.debug ~ "<p> sorting : <b>" ~ seq ~ " > " ~srch1[0] ~ " : "~ srch2[0] ~ "</b> = " ~ _sortValNS.retVal ~ "|" ~ val1 ~"</p><BR/>" -%}
-            #}
-            {%- if seq == srch1[0] and seq != srch2[0] -%}
-              {%- set _sortValNS.retVal = val1 -%}
-              {%- break -%}
+          {%- set pattern = "^!.*$" -%}
 
-            {%- elif seq == srch2[0] and seq != srch1[0] -%}
-              {%- set _sortValNS.retVal = val2 -%}
-              {%- break -%}
-
-            {%- elif seq == srch1[0] and seq == srch2[0] -%}
-              {%- for item in [val1, val2 ]|sort(case_sensitive=false) -%}
-                {%- set _sortValNS.retVal = item -%}
+          {%- if srch1[0]|string is search(pattern)  -%}
+            {%- set _sortValNS.retVal = val1 -%}
+          {%- elif srch2[0]|string is search(pattern) -%}
+            {%- set _sortValNS.retVal = val2 -%}
+          {%- else -%}
+            {%- for seq in ns.sequence|reverse -%}
+              {%- if seq == srch1[0] and seq != srch2[0] -%}
+                {%- set _sortValNS.retVal = val1 -%}
                 {%- break -%}
-              {%- endfor -%}                   
-              {%- break -%}
-              
-            {%- elif seq == "$temperature" -%}
-              {%- if val1 is search("^\d*[.,]{0,1}\d*$") and val2 is is search("^\d*[.,]{0,1}\d*$") -%}
-                {%- if val1|replace(",", ".")|float > val2|replace(",", ".")|float -%}  {%- set _sortValNS.retVal = val1 -%} {%- else -%}  {%- set _sortValNS.retVal = val2 -%} {%- endif -%}           
-                {%- break -%}      
-              {%- elif val1 is search("^\d*[.,]{0,1}\d*$") -%}
-                {%- set _sortValNS.retVal = val1|replace(",", ".") -%}          
-                {%- break -%}      
-              {%- elif val2 is search("^\d*[.,]{0,1}\d*$") -%}
-                {%- set _sortValNS.retVal = val2|replace(",", ".") -%}         
-                {%- break -%}      
-              {%- endif -%} 
 
-            {%- endif -%}           
-          {%- endfor -%}
+              {%- elif seq == srch2[0] and seq != srch1[0] -%}
+                {%- set _sortValNS.retVal = val2 -%}
+                {%- break -%}
+
+              {%- elif seq == srch1[0] and seq == srch2[0] -%}
+                {%- for item in [val1, val2 ]|sort(case_sensitive=false) -%}
+                  {%- set _sortValNS.retVal = item -%}
+                  {%- break -%}
+                {%- endfor -%}                   
+                {%- break -%}
+                
+              {%- elif seq == "$temperature" -%}
+                {%- if val1|string is search(cmdStrTstPatternNumP) and val2|string is search(cmdStrTstPatternNumP) -%}
+                  {%- if val1|float > val2|float -%}  {%- set _sortValNS.retVal = val1 -%} {%- else -%}  {%- set _sortValNS.retVal = val2 -%} {%- endif -%}           
+                  {%- break -%}      
+                {%- elif val1|string is search(cmdStrTstPatternNumP) -%}
+                  {%- set _sortValNS.retVal = val1 -%}          
+                  {%- break -%}      
+                {%- elif val2|string is search(cmdStrTstPatternNumP) -%}
+                  {%- set _sortValNS.retVal = val2 -%}         
+                  {%- break -%}      
+                {%- endif -%} 
+
+              {%- endif -%}           
+            {%- endfor -%}
+          {%- endif -%}
           {#
           {%- set ns.debug = ns.debug ~ "<p> sort : <b>" ~ srch1[0] ~ " : " ~ srch2[0] ~ "</b> = " ~ _sortValNS.retVal ~ "|" ~ val1 ~"</p><BR/>" -%}
           #}
 
-          {%- if not _sortValNS.retVal -%}{{-val1-}} {%-else -%}{{-_sortValNS.retVal-}} {%- endif -%}
-
-
+          {%- if not _sortValNS.retVal -%}{%- set _sortValNS.retVal = val1 -%} {%- endif -%}
+          {{- _sortValNS.retVal -}}
+        {#
+        {%- set ns.debug = ns.debug ~ ns.sequence|reverse|list ~ "<p> sorting : <b>" ~ seq ~ " > " ~srch1[0] ~ " : "~ srch2[0] ~ "</b> = " ~ _sortValNS.retVal ~"</p><BR/>" -%}
+        #}
         {%- endmacro -%}
         {# ___________________________________________________ #}
 
@@ -487,46 +930,74 @@ action:
         {%- macro getSettings(sName, sState, sCmd) -%}
           {%- set myCmd = sCmd|from_json -%}
           {%- if myCmd[sName] is defined and myCmd[sName][sState] is defined -%} 
-            {%- set ns.debug = ns.debug ~ "<p>User <b>" ~ sName ~ "</b> [" ~ sState ~ "] found.<BR/><i>" ~ myCmd[sName][sState]|to_json ~ "</i></p>"-%}
             {{- myCmd[sName][sState]|to_json -}}
-
-          {%- else -%}
-            {%- set ns.debug = ns.debug ~ "<p>User <b>" ~ sName ~ "</b> [" ~ sState ~ "] not found.<BR/></p>"-%}
-
-            {{- "{}" -}}
           {%- endif -%}
         {%- endmacro -%}
         {# ___________________________________________________ #}
 
         {# ___________________________________________________ #}
+        {%- macro translateAction(action) -%}
+        {%- set tA = namespace() -%}
+        {%- set tA.action = action|string or "" -%}
+        {%- for counter in range(0 , 4 ) -%}
+          {%- if tA.action is string and tA.action is search("^WP>.+$") -%}
+            {%- set plan = tA.action[3:] -%}
+            {%- if my_weekplan is defined and my_weekplan is mapping and my_weekplan.current is list -%}
+              {%- for wpItem in my_weekplan.current -%}
+                {%- if wpItem is defined and wpItem is mapping -%}
+                  {%- for wpItemKey in wpItem -%}
+                  {%- if wpItemKey == plan -%}
+                    {%- set tA.action = wpItem[wpItemKey].action -%}
+                  {%- endif -%}
+                  {%- endfor -%}
+                {%- endif -%}
+              {%- endfor -%}
+            {%- endif -%}
+          {%- elif tA.action is string and tA.action is search(cmdStrTstPatternNumPK) -%}
+            {%- set tA.action = tA.action.replace(",",".")|float|round(1)|string -%}
+          {%- else -%}
+            {%- break -%}
+          {%- endif -%}
+        {%- endfor -%}
+
+        {{- tA.action -}}
+        {%- endmacro -%}
+        {# ___________________________________________________ #}
+
+        {# ___________________________________________________ #}
         {%- macro mergeCmd(m1Cmd, m2Cmd) -%}
-          {%- set _mergeCmdNS = namespace() -%}
+          {%- set mC = namespace() -%}
           {%- set myCmd1 = m1Cmd|from_json -%}
           {%- set myCmd2 = m2Cmd|from_json -%}
-          {%- set _mergeCmdNS.myCmd = "" -%}
-          {%- set _mergeCmdNS.komma = "" -%}
+          {%- set mC.myCmd = "" -%}
+          {%- set mC.komma = "" -%}
 
           {%- for room in myCmd1 -%}
-            {%- if _mergeCmdNS.myCmd|length > 0 -%}{%- set _mergeCmdNS.komma = ", " -%}{%- else -%}{%- set _mergeCmdNS.komma = "" -%}{%- endif -%}  
+            {%- set mC.action1 = translateAction(myCmd1[room]) -%}
+            {%- if mC.myCmd|length > 0 -%}{%- set mC.komma = ", " -%}{%- else -%}{%- set mC.komma = "" -%}{%- endif -%}  
             {%- if myCmd2[room] is not defined -%}
-              {%- set _mergeCmdNS.myCmd = _mergeCmdNS.myCmd ~ _mergeCmdNS.komma ~ "\"" ~room ~ "\"" ~ ":" ~ getFormated(myCmd1[room]) -%}                      
+              {%- set mC.myCmd = mC.myCmd ~ mC.komma ~ "\"" ~room ~ "\"" ~ ":" ~ getFormated(mC.action1) -%}                      
             {%- endif -%}      
           {%- endfor -%}  
 
           {%- for room in myCmd2 -%}
-            {%- if _mergeCmdNS.myCmd|length > 0 -%}{%- set _mergeCmdNS.komma = ", " -%}{%- else -%}{%- set _mergeCmdNS.komma = "" -%}{%- endif -%}  
+            {%- set mC.action2 = translateAction(myCmd2[room]) -%}
+            {#
+            {%- set ns.debug = ns.debug ~ " -> " ~ room ~ " :2: " ~ mC.action2 -%}
+            #}
+            {%- if mC.myCmd|length > 0 -%}{%- set mC.komma = ", " -%}{%- else -%}{%- set mC.komma = "" -%}{%- endif -%}  
             {%- if myCmd1[room] is not defined -%} 
-              {%- set _mergeCmdNS.myCmd = _mergeCmdNS.myCmd ~ _mergeCmdNS.komma ~ "\"" ~room ~ "\"" ~ ":" ~ getFormated(myCmd2[room]) -%} 
+              {%- set mC.myCmd = mC.myCmd ~ mC.komma ~ "\"" ~room ~ "\"" ~ ":" ~ getFormated(mC.action2) -%} 
             {%- else -%}
-              {%- set val=sortVal(myCmd1[room], myCmd2[room]) -%}
-
+              {%- set mC.action1 = translateAction(myCmd1[room]) -%}
+              {%- set val=sortVal(mC.action1|string, mC.action2|string) -%}
               {%- if val -%} 
-                {%- set _mergeCmdNS.myCmd = _mergeCmdNS.myCmd ~ _mergeCmdNS.komma ~ "\"" ~room ~ "\"" ~ ":" ~ getFormated(val) -%} 
+                {%- set mC.myCmd = mC.myCmd ~ mC.komma ~ "\"" ~room ~ "\"" ~ ":" ~ getFormated(val) -%} 
               {%- endif -%}      
             {%- endif -%}      
           {%- endfor -%}
 
-          {{- "{" ~ _mergeCmdNS.myCmd ~ "}" -}}
+          {{- "{" ~ mC.myCmd ~ "}" -}}
      
         {%- endmacro -%}
         {# ___________________________________________________ #}
@@ -604,35 +1075,42 @@ action:
         {# ___________________________________________________ #}
         {%- macro getAction(cmd) -%}
           {%- set _getAction = namespace() -%}
+          {%- set _getAction.action = cmd -%}
+          {%- set _getAction.mode = "" -%}
        
-          {%- if cmd is search("^P!\d$") -%}
+          {%- if cmd is search("^!.*$") -%}
+            {%- set cmd = cmd[1:] -%}
+          {% endif %}
+
+          {%- if cmd is search("^P>\d$") -%}
             {%- set _getAction.action =  cmd[2:3] -%}
             {%- set _getAction.mode = "program" -%}
 
-          {%- elif  cmd is search("^WP![A-Za-z\d_]+?$") -%}
+          {%- elif  cmd is search("^WP>[A-Za-z\d_]+?$") -%}
             {%- set _getAction.action =  cmd[3:] -%}
             {%- set _getAction.mode = "weekplan" -%}
 
-          {%- elif  cmd is search("^\d*[.,]{0,1}\d*$")  or cmd is number -%}
-            {%- set _getAction.action = cmd|string|replace(",", ".")|float -%}
+          {%- elif  cmd is search(cmdStrTstPatternNumP)  or cmd is number -%}
+            {%- set _getAction.action = cmd|string|float -%}
             {%- set _getAction.mode = "temp" -%}
 
           {%- elif  cmd == "off"  -%}
             {%- set _getAction.action = none -%}
             {%- set _getAction.mode = "off" -%}
 
-          {%- elif  cmd is search("^boost!") -%}
+          {%- elif  cmd is search("^boost>") -%}
             {%- set _getAction.mode = "boost" -%}
             {%- set _getAction.action =  cmd[7:] -%}
 
           {% endif %}
           {%- set myaction = {
-            "action": _getAction.action or cmd,
+            "action": _getAction.action,
             "mode": _getAction.mode
             }
             -%}
           {{- myaction|to_json -}}
-
+          {#
+          #}
 
         {%- endmacro -%}
         {# ___________________________________________________ #}
@@ -654,7 +1132,6 @@ action:
           {%- set _action.action      = none -%}
           {%- set _action.subdevice   = none -%}
 
-
           {%- if _action.class == "HM" and _action.integration == "homematic" -%}
             {%- set subdevs = states.select | selectattr('entity_id', 'search', 'presetmodes$') | map(attribute='entity_id')|list -%}
             {%- set name = state_attr(c_dev, 'friendly_name').split(" ") -%}
@@ -669,7 +1146,9 @@ action:
             {% endif %}
           {% endif %}
 
-          {%- set cmds = getAction(c_cmd)|from_json -%}
+          {%- set cmds = getAction(c_cmd) -%} {%- if  cmds -%}{%- set cmds = cmds|from_json -%}{%- endif -%}
+
+
           {%- set _action.mode = cmds.mode -%}
           {%- set _action.action = cmds.action -%}
           {%- if  _action.mode == "boost" -%}
@@ -688,18 +1167,31 @@ action:
             "subdevice": _action.subdevice, 
             "deviceID": _action.deviceID, 
             "submode": _action.submode, 
+            "current_temperatur": state_attr(_action.device, "current_temperature"),
+            "target_temperatur": state_attr(_action.device, "temperature"),
+            "hvac_modes": state_attr(_action.device, "hvac_action"),
+            "hvac_action": state_attr(_action.device, "temperature"),
+            "state": states(_action.device),
             "action" : _action.action
+
             }]
             -%}
           {{- myaction|to_json -}}
-
+          {#
+          #}
         {%- endmacro -%}
         {# ___________________________________________________ #}
 
+
+
         {%- set ns = namespace() -%}
-        {%- set ns.cmd = default_cmd -%}
-        {%- set ns.sequence = sequence.split(",") -%}
         {%- set ns.debug = "" -%}
+
+        {%- set ns.cmd = myConfig.defaultCmd -%}
+        {%- set ns.sequence = myConfig.sequence -%}
+
+
+
         {%- set ns.devices = [] -%}
         {%- set ns.manipulated_devices = [] -%}
         {%- set ns.usedWeekplanes = [] -%}
@@ -709,19 +1201,26 @@ action:
         wenn mode exclusiv == true > break
         #}
         {%- set ns.userbreak = false -%}
-        {%- for switch in switches -%}
-          {%- if switch.device and switch.device != "-" -%}
+        {%- set ns.debug = ns.debug ~ "<ul>" -%}
+        {%- set ns.debug = ns.debug ~ "<li>switches :<ul>" -%}
+
+        {%- for switch in myConfig.switches -%}
+          {%- if "device" in switch and switch.device != "-" -%}
+            {%- if "on_cmd" in switch -%}{%- set onCmd = isCmdString(switch.on_cmd) -%}{%- else -%}{%- set onCmd = "{}" -%}{%- endif -%}
+            {%- if "off_cmd" in switch -%}{%- set offCmd = isCmdString(switch.off_cmd) -%}{%- else -%}{%- set offCmd = "{}" -%}{%- endif -%}
+            {%- if "on_mode" in switch and switch.on_mode -%}{%- set onMode = True -%}{%- else -%}{%- set onMode = False -%}{%- endif -%}
+            {%- if "off_mode" in switch and switch.off_mode -%}{%- set offMode = True -%}{%- else -%}{%- set offMode = False -%}{%- endif -%}           
             {%- if states(switch.device) == "on" -%}
-              {%- set ns.debug = ns.debug ~ "<p> switch : <b>" ~ switch.device ~ "</b> is on<BR/>" ~ switch.on_cmd ~ "<br/>breakmode=" ~ switch.on_mode ~"</p>" -%}
-              {%- set ns.cmd = mergeCmd(ns.cmd, switch.on_cmd) -%}
-              {%- if switch.on_mode -%}
+              {%- set ns.debug = ns.debug ~ "<li>" ~ switch.device ~ " is on</li><ul><li>cmd: " ~ onCmd ~ "</li><li>breakmode=" ~ onMode ~"</li></ul>" -%}
+              {%- set ns.cmd = mergeCmd(ns.cmd, onCmd) -%}
+              {%- if onMode -%}
                 {%- set ns.userbreak = true -%}
                 {%- break -%}
               {%- endif -%}
             {%- elif states(switch.device) == "off" -%}
-              {%- set ns.debug = ns.debug ~ "<p> switch : <b>" ~ switch.device ~ "</b> is off<BR/>" ~ switch.off_cmd ~ "<br/>breakmode=" ~ switch.off_mode ~"</p>" -%}
-              {%- set ns.cmd = mergeCmd(ns.cmd, switch.off_cmd) -%}
-              {%- if switch.off_mode -%}
+              {%- set ns.debug = ns.debug ~ "<li>" ~ switch.device ~ " is off</li><ul><li>cmd: " ~ offCmd ~ "</li><li>breakmode=" ~ offMode ~"</li></ul>" -%}
+              {%- set ns.cmd = mergeCmd(ns.cmd, offCmd) -%}
+              {%- if offMode -%}
                 {%- set ns.userbreak = true -%}
                 {%- break -%}
               {%- endif -%}
@@ -730,15 +1229,16 @@ action:
             {%- endif -%}
           {%- endif -%}
         {%- endfor -%}
+        {%- set ns.debug = ns.debug ~ "</ul></li>" -%}
+        {%- set ns.debug = ns.debug ~ "<li>cmd :<ul><li>" ~ ns.cmd ~ "</li></ul></li>" -%}
 
         {#
         ns.cmd wird über den Status der persons befüllt/geändert wenn kein switch den mode exclusiv auf true hatte
         #}
-
         {%- if not ns.userbreak -%}
           {%- set ns.usercmd = "{}" -%}
-          {%- set ns.debug = ns.debug ~ "<p>persons:<br>" -%}
-          {%- for person in linked_persons -%}
+          {%- set ns.debug = ns.debug ~ "<li>persons :<ul>" -%}
+          {%- for person in myConfig.persons -%}
             {%- set name = getName(person) -%}
             {%- set state = states(person) -%}
             {%- set mystates = state.split("!") -%}
@@ -746,15 +1246,23 @@ action:
               {%- set state = mystates[1] -%}
               {%- set name = mystates[0] -%}
             {%- endif -%}
-
-
-            {%- set ns.debug = ns.debug ~ "<i>" ~ name ~ " : " ~ state ~ "<i/><br>" -%}
-            {%- set ns.usercmd = getSettings(name, state, jsonCmd) -%}
+            {%- set ns.debug = ns.debug ~ "<li>" ~ name ~ " [" ~ state ~ "]<ul>" -%}
+            {%- set ns.usercmd = getSettings(name, state, myConfig.cmd) -%}
+            {%- if not ns.usercmd -%}
+              {%- set ns.debug = ns.debug ~ "<li>" ~ state ~ " not found</li>"-%}
+              {%- set ns.usercmd = "{}" -%}
+            {%- else -%}
+              {%- set ns.debug = ns.debug ~ "<li>" ~ state ~ " found</li>"-%}
+            {%- endif -%}
             {%- set ns.cmd = mergeCmd(ns.cmd, ns.usercmd) -%}
-            {#
-            #}
+
+            {%- set ns.debug = ns.debug ~ "<li>" ~ ns.usercmd ~ "</li>" -%}
+            {%- set ns.debug = ns.debug ~ "</ul>" -%}
+
           {%- endfor -%}
-          {%- set ns.debug = ns.debug ~ "</p>" -%}
+          {%- set ns.debug = ns.debug ~ "</ul></li>" -%}
+          {%- set ns.debug = ns.debug ~ "<li>cmd :<ul><li>" ~ ns.cmd ~ "</li></ul></li>" -%}
+
         {%- endif -%}
         {%- set ns.cmd = ns.cmd|from_json -%}
 
@@ -767,8 +1275,10 @@ action:
             {%- set tmp.integrations = tmp.integrations + [{"key": key, "dev": integration_entities(key)}] -%}    
           {%- endif -%}
         {%- endfor -%}
+        {%- set ns.debug = ns.debug ~ "<li>action on device :<ul>" -%}
 
-        {%- for device in linked_heatings -%}
+
+        {%- for device in myConfig.devices -%}
           {%- for itm, val in ns.cmd.items() -%}
             {%- if state_attr(device, 'friendly_name') is match(itm) and not device in ns.manipulated_devices|map(attribute='device')|list -%}
               {%- set tmp.myintegration = "else" -%}
@@ -780,14 +1290,18 @@ action:
                 {%- endif -%}
               {%- endfor -%}
               {%- set tmp.action = createAction(device, val, itm) -%}
-
-
               {%- if tmp.action and tmp.action != "" -%}
-                {%- set ns.manipulated_devices = ns.manipulated_devices + tmp.action|from_json -%}    
+                {%- set tmp.action = tmp.action|from_json -%}
+                {%- set ns.manipulated_devices = ns.manipulated_devices + tmp.action -%}
+                {%- set ns.debug = ns.debug ~ "<li>" ~ tmp.action[0].device ~ "<ul><li>" ~ tmp.action[0] ~ "</li></ul></li>" -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}        
         {%- endfor -%}
+        {%- set ns.debug = ns.debug ~ "</ul></li>" -%}
+        {%- set ns.debug = ns.debug ~ "statefilestate:" ~ statefile_state.stdout -%}
+        {%- set ns.debug = ns.debug ~ "</ul>" -%}
+        {%- set ns.debug = ns.debug -%}
 
         {{ {"data": ns.cmd, "debug": ns.debug, "devices": ns.manipulated_devices } }}
 
@@ -799,7 +1313,26 @@ action:
       - action: notify.persistent_notification
         metadata: {}
         data:
-          message: '{{debugmessage_post ~ "default :<BR/>" ~ default_cmd ~ "<hr>" ~ my_settings.debug ~ "<BR/>Result :<BR/>" ~ my_settings.data ~ "<BR/>devices :<BR/>" ~ my_settings.devices }}'    
+          title: "Debug TgHeating"
+          message: 'Result:{{ my_weekplan.debug }}{{ my_settings.debug  }}'   
+
+# Weekplan set next timer    
+  - if:
+      - condition: template
+        value_template: "{{my_weekplan.next is defined}}"
+    then:
+      - action: timer.cancel
+        metadata: {}
+        data: {}
+        target:
+          entity_id: "{{weekplan_timer}}"
+      - action: timer.start
+        metadata: {}
+        data:
+          duration: "{{my_weekplan.next}}"
+        target:
+          entity_id: "{{weekplan_timer}}"
+
 
 # DEVICE: HM-IP, SET: programm
   - variables:
@@ -813,6 +1346,7 @@ action:
       - action: notify.persistent_notification
         metadata: {}
         data:
+          title: "Debug TgHeating"
           message: '{{"<u>Devices</u><br>filtered by<BR>class=HmIP, set=program <BR>" ~ my_devices}}'    
 
   - repeat:
@@ -829,6 +1363,7 @@ action:
             - action: notify.persistent_notification
               metadata: {}
               data:
+                title: "Debug TgHeating"
                 message: '{{- current_device -}} : {{- my_devices[repeat.index - 1].action -}}'
 
         - action: climate.set_hvac_mode
@@ -871,6 +1406,7 @@ action:
       - action: notify.persistent_notification
         metadata: {}
         data:
+          title: "Debug TgHeating"
           message: '{{"<u>Devices</u><br>filtered by<BR>class=HM, set=program, subdevice=defined  <BR>" ~ my_devices}}'    
 
   - repeat:
@@ -903,6 +1439,7 @@ action:
       - action: notify.persistent_notification
         metadata: {}
         data:
+          title: "Debug TgHeating"
           message: '{{"<u>Devices</u><br>filtered by<BR>class=H[Mm], set=off  <BR>" ~ my_devices}}'    
 
   - repeat:
@@ -928,6 +1465,7 @@ action:
       - action: notify.persistent_notification
         metadata: {}
         data:
+          title: "Debug TgHeating"
           message: '{{"<u>Devices</u><br>filtered by<BR>class=H[Mm], set=temp  <BR>" ~ my_devices}}'    
 
   - repeat:
@@ -959,6 +1497,7 @@ action:
       - action: notify.persistent_notification
         metadata: {}
         data:
+          title: "Debug TgHeating"
           message: '{{"<u>Devices</u><br>filtered by<BR>class= -, set=off  <BR>" ~ my_devices}}'    
 
   - repeat:
@@ -983,6 +1522,7 @@ action:
       - action: notify.persistent_notification
         metadata: {}
         data:
+          title: "Debug TgHeating"
           message: '{{"<u>Devices</u><br>filtered by<BR>class= -, set=temp  <BR>" ~ my_devices}}'    
 
   - repeat:
@@ -996,11 +1536,10 @@ action:
         - action: climate.set_temperature
           metadata: {}
           data:
-            temperature: "{{- my_devices[repeat.index - 1].action -}}"
+            temperature: "{{- my_devices[repeat.index - 1].action|string -}}"
             hvac_mode: auto
           target:
             entity_id: "{{- my_devices[repeat.index - 1].device -}}"     
 
 mode: single
-
 
