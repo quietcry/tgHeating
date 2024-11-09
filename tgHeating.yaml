@@ -8,7 +8,7 @@ blueprint:
   input:
     debugmode:
       name: "debug mode"
-      description: Configuration<br>ldesngorw
+      description: Configuration
       default: false
       selector:
         boolean:
@@ -52,14 +52,14 @@ blueprint:
       input:  
         default_cmd:
           name:  "default:"
-          default: '{"WZ":"off","KU":"off","AZ":"off","GZ1":"off","GZ2":"off","GT":"off","FL":"off","BD":"off","SZ":"off"}'
+          default: '{}'
           selector:
             text:
               multiline: true
 
         sequence:
           name: "sequence"
-          default: 'on,off,boost,$temperature,WP,P'
+          default: 'off,boost,T,WP,P'
 
     conf_statusfile:
       name: store in statefile
@@ -111,13 +111,13 @@ blueprint:
           multiline: true
 
     switch_1:
-      name: Schalter 1
+      name: switch 1
       icon: mdi:cog
       collapsed: true
-      description: Konfiguration Schalter 1
+      description: configuration switch 1
       input:  
         switch_1_device:
-          name: verknüpfte Entität
+          name: switch entity
           default: "-"
           selector:
             entity:
@@ -134,7 +134,7 @@ blueprint:
               multiline: true
 
         switch_1_on_mode:
-          name: "exclusive-Modus"
+          name: "exclusive Mode (on)"
           default: 
           selector:
             boolean:
@@ -146,19 +146,19 @@ blueprint:
             text:
               multiline: true
         switch_1_off_mode:
-          name: "off-Modus"
+          name: "exclusive Mode (off)"
           default: 
           selector:
             boolean:
 
     switch_2:
-      name: Schalter 2
+      name: switch 2
       icon: mdi:cog
       collapsed: true
-      description: Konfiguration Schalter 2
+      description: configuration switch 2
       input:  
         switch_2_device:
-          name: verknüpfte Entität
+          name: switch entity
           default: "-"
           selector:
             entity:
@@ -175,7 +175,7 @@ blueprint:
               multiline: true
 
         switch_2_on_mode:
-          name: "exclusive-Modus"
+          name: "exclusive Mode (on)"
           default: 
           selector:
             boolean:
@@ -187,19 +187,19 @@ blueprint:
             text:
               multiline: true
         switch_2_off_mode:
-          name: "off-Modus"
+          name: "exclusive Mode (off)"
           default: 
           selector:
             boolean:
 
     switch_3:
-      name: Schalter 3
+      name: switch 3
       icon: mdi:cog
       collapsed: true
-      description: Konfiguration Schalter 3
+      description: configuration switch 3
       input:  
         switch_3_device:
-          name: verknüpfte Entität
+          name: switch entity
           default: "-"
           selector:
             entity:
@@ -216,7 +216,7 @@ blueprint:
               multiline: true
 
         switch_3_on_mode:
-          name: "exclusive-Modus"
+          name: "exclusive Mode (on)"
           default: 
           selector:
             boolean:
@@ -228,19 +228,19 @@ blueprint:
             text:
               multiline: true
         switch_3_off_mode:
-          name: "off-Modus"
+          name: "exclusive Mode (off)"
           default: 
           selector:
             boolean:
 
     switch_4:
-      name: Schalter 4
+      name: switch 4
       icon: mdi:cog
       collapsed: true
-      description: Konfiguration Schalter 4
+      description: configuration switch 4
       input:  
         switch_4_device:
-          name: verknüpfte Entität
+          name: switch entity
           default: "-"
           selector:
             entity:
@@ -257,7 +257,7 @@ blueprint:
               multiline: true
 
         switch_4_on_mode:
-          name: "exclusive-Modus"
+          name: "exclusive Mode (on)"
           default: 
           selector:
             boolean:
@@ -269,19 +269,19 @@ blueprint:
             text:
               multiline: true
         switch_4_off_mode:
-          name: "off-Modus"
+          name: "exclusive Mode (off)"
           default: 
           selector:
             boolean:
 
     switch_5:
-      name: Schalter 5
+      name: switch 5
       icon: mdi:cog
       collapsed: true
-      description: Konfiguration Schalter 5
+      description: configuration switch 5
       input:  
         switch_5_device:
-          name: verknüpfte Entität
+          name: switch entity
           default: "-"
           selector:
             entity:
@@ -298,7 +298,7 @@ blueprint:
               multiline: true
 
         switch_5_on_mode:
-          name: "exclusive-Modus"
+          name: "exclusive Mode (on)"
           default: 
           selector:
             boolean:
@@ -310,7 +310,7 @@ blueprint:
             text:
               multiline: true
         switch_5_off_mode:
-          name: "off-Modus"
+          name: "exclusive Mode (off)"
           default: 
           selector:
             boolean:
@@ -396,6 +396,7 @@ trigger:
   - platform: homeassistant
     event: start
     id: haStart
+  # only for development    
   - platform: state
     entity_id: input_boolean.reloadconfig
     from: "on"
@@ -860,15 +861,20 @@ action:
 
         {# ___________________________________________________ #}
         {%- macro getName(personid) -%}
-          {%- set tmp = personid.split(".") -%}
-          {%- set pos = tmp|length -%}
-          {%- set tmp = tmp[pos-1].split("_") -%}
-          {%- set pos = tmp|length -%}
-          {%- if tmp|length > 1 and  tmp[pos-1]|int(-1) != -1 -%}
-            {{- tmp[pos-2] ~ "_" ~ tmp[pos-1] -}}
-          {%- else -%}
-            {{- tmp[pos-1] -}}
-          {%- endif -%}              
+          {%- set gN = namespace() -%}
+          {%- set gN.fName = state_attr(personid, "friendly_name") -%}
+          {%- if gN.fName == None -%}
+            {%- set tmp = personid.split(".") -%}
+            {%- set pos = tmp|length -%}
+            {%- set tmp = tmp[pos-1].split("_") -%}
+            {%- set pos = tmp|length -%}
+            {%- if tmp|length > 1 and  tmp[pos-1]|int(-1) != -1 -%}
+              {%- set gN.fName = tmp[pos-2] ~ "_" ~ tmp[pos-1] -%}
+            {%- else -%}
+              {%- set gN.fName = tmp[pos-1] -%}
+            {%- endif -%}              
+          {%- endif -%}
+          {{-gN.fName-}}
         {%- endmacro -%}
         {# ___________________________________________________ #}
 
@@ -1037,7 +1043,7 @@ action:
             {%- set mode = "program" -%}
           {%- elif c_cmd is search("^boost") -%}
             {%- set mode = "boost" -%}
-            {%- set action = c_cmd[6:c_cmd|length] -%}
+            {%- set action = c_cmd[6:] -%}
             {%- if action is search("^P\d$") -%}
               {%- set action = "week_program_" ~ action[1:2] -%}
               {%- set submode = "program" -%}
