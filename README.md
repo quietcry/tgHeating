@@ -1,4 +1,4 @@
-# Heating control based person state
+# Heating control based by person state
 
 ## What is this blueprint for?
 
