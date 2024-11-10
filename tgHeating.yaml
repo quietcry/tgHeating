@@ -82,7 +82,7 @@ blueprint:
       input:  
         weekplan_cmd:
           name:  "Weekplans:"
-          default: '{"plan1":{"1":["14:54-P>3","00:09-P>3","24:00-P>1"],"2":"15:30-p5","3":"3:plan2","4":"1:plan2"}}'
+          default: '{}'
           selector:
             text:
               multiline: true
@@ -100,12 +100,7 @@ blueprint:
 
     jsonCmd:
       name: 'JSON Command line'
-      default: '{
-                "tommy":  {
-                          "playtime":{"WZ":"P>3", "KU":24, "AZ":"P>2"},
-                          "home":{"AZ":"P>1"}
-                          }
-                }'
+      default: '{}'
       selector:
         text:
           multiline: true
@@ -437,9 +432,6 @@ action:
       myConfig: >-
         {# ___________________________________________________ #}
         {%- macro readconfig() -%}
-          {#
-          {"switches":[{"name":"switch_37","device":"input_boolean.personbewohner_01activ"}],"persons":["person.tommy","input_text.status_bewohner_01"],"devices":["mydevice"]}
-          #}
           {%- set cfg = namespace() -%}
           {%- set cfg.persons = [] + linked_persons -%}
           {%- set cfg.devices = [] + linked_heatings -%}
