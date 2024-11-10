@@ -432,9 +432,6 @@ condition:
             {%- endif -%}
           {%- endif -%}
 action:
-  - variables:
-      debugmessage_pre:  "<u>debugmode pre</u><BR/>"
-      debugmessage_post: "<u>debugmode post</u><BR/>"
 
   - variables:
       myConfig: >-
@@ -603,20 +600,7 @@ action:
         data:
           title: "Debug TgHeating"
           message: >-
-
             {{debugMsg}}
-            Konfiguration:<ul>{%- for key, val  in myConfig.items() -%}<li><i><b>{{key}}:</b></i>
-            {%- if val is list -%}
-              <ul>
-              {%- for item in val -%}
-              <li>{{- item -}}</li>
-              {%- endfor -%}
-              </ul>
-            {%- else -%}            
-              <ul><li>{{- val -}}</li></ul>
-            {%- endif -%}
-            </li>
-            {%- endfor -%}</ul>
             triggered by: <ul><li>{%- if "id" in trigger -%}{{- trigger["id"] }}{%- endif %} [<i>{%- if "entity_id" in trigger -%}{{- trigger["entity_id"] }}{%- else -%}{{- trigger -}}{%- endif -%}</i>]</li></ul>
   - if:
       - condition: template
@@ -909,7 +893,7 @@ action:
                 {%- endfor -%}                   
                 {%- break -%}
                 
-              {%- elif seq == "$temperature" -%}
+              {%- elif seq == "T" -%}
                 {%- if val1|string is search(cmdStrTstPatternNumP) and val2|string is search(cmdStrTstPatternNumP) -%}
                   {%- if val1|float > val2|float -%}  {%- set _sortValNS.retVal = val1 -%} {%- else -%}  {%- set _sortValNS.retVal = val2 -%} {%- endif -%}           
                   {%- break -%}      

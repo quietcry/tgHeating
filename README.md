@@ -56,8 +56,8 @@ yes, of course there are also disadvantages
 - The status of the people is evaluated and if there is an entry for them in the command field, this entry is integrated into the command variable.
 - the thermostats are set according to the command variable
 
-#### What do I mean by "command"
-commands are set in Blueprint configuration as JSON-Objects.  
+#### What do I mean by "command set"
+commands sets are setted in Blueprint configuration as JSON-Objects. A command set consists of zero to as many command elements as necessary. A command element is a key-value pair. The key identifies the device, while the value contains the actual command 
 
 ```{<key>:<value>, <key>:<value>. ...}```
 * The **key** is a unique substring from the thermostat's "friendly_name", starting from the beginning of the word.  
@@ -164,7 +164,7 @@ if weekplan "noOneHome" is active
 - on Tuesday use the same settings like the last configurated day, in this case Monday 
 - on Wednesday set temperature to 22°C at 9:00 and turn off device at 22:00
 - on Thursday use the same settings like Monday
-- on Friday nothing is configurated -> nothing happens 
+- on Friday nothing is configurated -> nothing happens temperature is still 15°C
 - on Saturday, use the same settings as the last configured day, in this case Thursday, which is linked to Monday
 - on Sunday, use the configuration of sunday in weekplan "someOneHome"
 
