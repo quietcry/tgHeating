@@ -11,7 +11,9 @@ In the last few years I have been switching between home office and office very 
 **The blueprint is certainly not fully developed and probably contains errors**   
 **Before you boldly import and use the blueprint, a backup certainly makes sense! You should also deactivate your previous heating automation.**   
 
-[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fquietcry%2FtgHeating%2FtgHeating.yaml)
+[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fquietcry%2FtgHeating%2Fblob%2F09539fd1af9e55f1c1d29c87956c7e94d8b8f5ca%2FtgHeating.yaml)
+
+
 
 ## Table of Contents
 
